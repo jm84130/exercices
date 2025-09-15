@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quiz Voyants PL — Examen / Exercice</title>
+<style>
+  :root{--bg:#0e1116;--card:#151a21;--muted:#98a2b3;--accent:#4da3ff}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:#e9eef5;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px}
+  h1{font-size:22px;margin:0 0 12px;display:flex;gap:10px;align-items:center}
+  .pill{padding:2px 8px;border:1px solid #2a3340;border-radius:999px;background:#151b22;color:#b7c3d6}
+  .board{background:var(--card);border:1px solid #212733;border-radius:16px;padding:18px;position:relative}
+  .center{display:grid;grid-template-columns:180px 1fr;gap:18px;align-items:center;border:1px dashed #2a3340;border-radius:12px;min-height:160px;margin-bottom:16px;background:#10151b;padding:12px}
+  .pictobox{display:grid;place-items:center;background:#0b0f14;border:1px solid #1e2633;border-radius:12px;height:150px}
+  .pictobox img{max-height:130px;max-width:160px;display:block}
+  .meta .desc{font-size:14px;color:#a9b6c9}
+  .question{font-size:16px;color:#c9d4e3;margin:6px 0 12px}
+  .opts{display:grid;gap:10px}
+  button.opt{ text-align:left;background:#1a2029;border:1px solid #263042;color:#eaeff6;border-radius:12px;padding:12px 14px;font-size:15px;cursor:pointer;transition:.12s transform,.12s background }
+  button.opt:hover{background:#1f2733;transform:translateY(-1px)}
+  .controls{display:flex;gap:10px;margin-top:12px}
+  .ghost{opacity:.6}
+  .footer{margin-top:12px;color:var(--muted);font-size:13px}
+  .badge{background:#1f2630;border:1px solid #283040;padding:6px 10px;border-radius:999px;color:#c5d0df;font-size:13px}
+  .hud{display:flex;gap:12px;align-items:center;color:#cbd5e1;font-size:14px;margin-bottom:16px;flex-wrap:wrap}
+  .top-actions{margin-left:auto;display:flex;gap:8px}
+  .iconbtn{display:inline-flex;align-items:center;gap:8px;background:#141a22;border:1px solid #273142;color:#d9e3f1;border-radius:10px;padding:8px 10px;cursor:pointer;font-size:14px}
+  .iconbtn:hover{background:#19212b}
+  .seg{display:inline-flex;background:#121823;border:1px solid #273142;border-radius:12px;overflow:hidden}
+  .seg button{background:transparent;border:0;color:#d7e3f6;padding:8px 12px;cursor:pointer}
+  .seg button.active{background:#1a2330}
+
+  /* Modal bibliothèque */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:20px}
+  .modal.open{display:flex}
+  .sheet{background:#0f141b;border:1px solid #223044;border-radius:16px;max-width:940px;width:100%;max-height:86vh;overflow:hidden;display:flex;flex-direction:column}
+  .sheet header{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:12px 12px;border-bottom:1px solid #213044}
+  .sheet h2{font-size:16px;margin:0;color:#dfe9f7}
+  .sheets{padding:12px;display:grid;gap:12px;overflow:auto}
+  .sheets img{width:100%;height:auto;border:1px solid #1f2a3b;border-radius:12px;background:#070b10}
+
+  .system{margin-left:auto; color:#9fb1c9}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>
+    Voyants PL — <span class="pill">Mode Examen / Exercice</span>
+    <span class="top-actions">
+      <div class="seg" id="modeSeg">
+        <button data-mode="exercice" class="active">Exercice</button>
+        <button data-mode="examen">Examen</button>
+      </div>
+      <button id="openLib" class="iconbtn" title="Bibliothèque des pictogrammes">📘 Bibliothèque</button>
+    </span>
+  </h1>
+
+  <div class="hud">
+    <div class="badge">Mode : <span id="modeLabel">Exercice</span></div>
+    <div class="badge">Étape : <span id="stepLabel">Choix initial</span></div>
+    <div class="badge">Question : <span id="qnum">1</span></div>
+    <div class="system" id="sysMsg"></div>
+  </div>
+
+  <div class="board">
+    <div class="center">
+      <div class="pictobox"><img id="pictogram" alt="Pictogramme" /></div>
+      <div class="meta">
+        <div class="desc" id="vMechanics">—</div>
+      </div>
+    </div>
+
+    <div id="stage" class="question"></div>
+    <div id="opts" class="opts"></div>
+
+    <div class="controls">
+      <button id="prev" class="opt">◀ Précédent</button>
+      <button id="next" class="opt">Suivant ▶</button>
+      <button id="restart" class="opt">Recommencer</button>
+    </div>
+    <div class="footer">Règle : <i>les trois choix initiaux restent toujours dans le même ordre</i>. Ensuite, les propositions sont <b>mélangées</b> automatiquement.</div>
+  </div>
+</div>
+
+<!-- Modal Bibliothèque -->
+<div id="libModal" class="modal" aria-hidden="true" role="dialog">
+  <div class="sheet">
+    <header>
+      <h2>Bibliothèque des pictogrammes</h2>
+      <button id="closeLib" class="iconbtn">✖ Fermer</button>
+    </header>
+    <div class="sheets">
+      <img src="https://www.dropbox.com/scl/fi/i7ce5gpzf404gsi8wkb8k/voyants-3.jpg?rlkey=5xc7bw4h2h8qg2vpd5enn962g&st=c8vd0ntj&raw=1" alt="Planche voyants 1">
+      <img src="https://www.dropbox.com/scl/fi/1ieugf4pxxhh0xil07myp/voyants-2.jpg?rlkey=adgtdlovnal07v6vufokwstkh&st=w4eaf729&raw=1" alt="Planche voyants 2">
+      <img src="https://www.dropbox.com/scl/fi/33lrkx409o4eiv1d8ijec/voyants-1.jpg?rlkey=667xbgxm0io398zd9nfpfe39c&st=wps4qro9&raw=1" alt="Planche voyants 3">
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- Utilitaires ----------
+const RAW=(u)=>{try{const url=new URL(u);url.searchParams.set('raw','1');url.searchParams.delete('dl');return url.toString()}catch(e){return u}};
+const shuffle=(arr)=>arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+
+// ---------- Banque de voyants (démo) ----------
+const BANK=[
+  {
+    id:'prealert_maint', isProblem:false,
+    img: RAW('https://www.dropbox.com/scl/fi/0zh65nul7flvwcrymq4u8/1.jpg?rlkey=6vf42oa242iy2ph38e8bqytpz&st=59eknoxg&raw=1'),
+    flows:{
+      continue:{ ok:true, message:"OK : on continue en surveillant le TDB pour un éventuel message." },
+      call:{ toQuiz:false, message:"Appel inutile pour ce voyant informatif → Game Over." },
+      repair:{ toQuiz:false, message:"Aucune réparation à faire ici → Game Over." }
+    }
+  },
+  {
+    id:'info_defauts_presents', isProblem:false,
+    img: RAW('https://www.dropbox.com/scl/fi/unapv79yrt6cmxylik3iy/2.jpg?rlkey=qesrx3mdrnfn9mb1zzig434ld&st=h4i75una&raw=1'),
+    flows:{
+      continue:{ ok:true, message:"OK : on continue en surveillant le TDB pour message/alerte associée." },
+      call:{ toQuiz:false, message:"Appel non requis d'emblée → Game Over." },
+      repair:{ toQuiz:false, message:"Pas d'action mécanique immédiate → Game Over." }
+    }
+  }
+ ,{
+    id:'maint_non_active', isProblem:false,
+    img: RAW('https://www.dropbox.com/scl/fi/c2shaa8pslrvuwj1jgsvh/3.jpg?rlkey=3598tq8kb4nd9c3eog5o53496&st=yu3pht0z&raw=1'),
+    flows:{
+      continue:{ ok:true, message:"OK : rien à faire, on continue en surveillant le TDB." },
+      call:{ toQuiz:false, message:"Appel inutile pour ce témoin → Game Over." },
+      repair:{ toQuiz:false, message:"Aucune action conducteur requise → Game Over." }
+    }
+  },
+  {
+    id:'alerte_maintenance', isProblem:false,
+    img: RAW('https://www.dropbox.com/scl/fi/yzxn8ixlvx74uwvga008w/4.jpg?rlkey=y1vbkvsycyrl5jwkcgfs655um&st=u3g3m8zp&raw=1'),
+    flows:{
+      continue:{ ok:false, message:"Mauvais réflexe : il faut prévenir l’exploitation pour planifier." },
+      call:{
+        toQuiz:true,
+        prompt:"Que dis-tu à l’exploitation ? (description du voyant)",
+        choices:[
+          { text:"« Témoin alerte maintenance allumé : merci de planifier la visite annuelle. »", good:true },
+          { text:"« Vite, le camion va exploser, appelez les pompiers ! »", fun:true },
+          { text:"« Voyant pression d’huile rouge : arrêt immédiat. »", wrong:true },
+          { text:"« Petit rappel maintenance, on verra plus tard si on a le temps. »", near:true }
+        ],
+        onGood:{ message:"OK : message pertinent, RDV à planifier." },
+        onBad:{  message:"Formulation inadaptée → Game Over." }
+      },
+      repair:{ toQuiz:false, message:"Pas de réparation conducteur ici → Game Over." }
+    }
+  },
+  {
+    id:'maint_active_non_init', isProblem:false,
+    img: RAW('https://www.dropbox.com/scl/fi/pgczvc8df5cjcr3b42odm/5.jpg?rlkey=pg6o71rv43uoutcmcmdvt5561&st=z5ywk40l&raw=1'),
+    flows:{
+      continue:{ ok:false, message:"Il faut prévenir l’exploitation pour organiser la réinitialisation." },
+      call:{
+        toQuiz:true,
+        prompt:"Que dis-tu à l’exploitation ? (description du voyant)",
+        choices:[
+          { text:"« Témoin maintenance active non initialisée : prévoir réinitialisation en atelier. »", good:true },
+          { text:"« Je réinitialise tout en roulant, c’est plus simple. »", fun:true },
+          { text:"« Défaut ABS : distances d’arrêt allongées. »", wrong:true },
+          { text:"« Témoin maintenance allumé, je coupe/redémarre et c’est réglé. »", near:true }
+        ],
+        onGood:{ message:"OK : passage atelier pour réinitialisation." },
+        onBad:{  message:"Formulation inadaptée → Game Over." }
+      },
+      repair:{ toQuiz:false, message:"Pas une action conducteur → Game Over." }
+    }
+  },
+  {
+    id:'echeance_maintenance', isProblem:false,
+    img: RAW('https://www.dropbox.com/scl/fi/5wel46t7i68tel0n6us54/6.jpg?rlkey=29fh2n5yhv2nmybgzzgv7p4m5&st=gmetae1y&raw=1'),
+    flows:{
+      continue:{ ok:false, message:"Mauvais réflexe : il faut prévenir et programmer en urgence." },
+      call:{
+        toQuiz:true,
+        prompt:"Que dis-tu à l’exploitation ? (description du voyant)",
+        choices:[
+          { text:"« Échéance maintenance atteinte/dépassée : urgence à prendre RDV pour la visite annuelle. »", good:true },
+          { text:"« On change le moteur sur le parking du client, c’est plus rapide. »", fun:true },
+          { text:"« Témoin de préchauffage : j’attends avant de démarrer. »", wrong:true },
+          { text:"« Alerte maintenance à prévoir un jour quand on pourra. »", near:true }
+        ],
+        onGood:{ message:"OK : urgence RDV validée." },
+        onBad:{  message:"Formulation inadaptée → Game Over." }
+      },
+      repair:{ toQuiz:false, message:"Pas de réparation conducteur → Game Over." }
+    }
+  },
+  {
+    id:'defaut_afficheur', isProblem:true,
+    img: RAW('https://www.dropbox.com/scl/fi/purf363r0gkaql8ql7jfb/7.jpg?rlkey=puxptu1vwb3n3ubz7y4mxm6p1&st=l74l3l9h&raw=1'),
+    flows:{
+      continue:{ ok:false, message:"Mauvais réflexe : il faut signaler pour correction en garage." },
+      call:{
+        toQuiz:true,
+        prompt:"Que dis-tu à l’exploitation ? (description du voyant)",
+        choices:[
+          { text:"« Défaut afficheur/combiné : merci de programmer un contrôle en garage. »", good:true },
+          { text:"« Je mets un post-it à la place des jauges, c’est pareil. »", fun:true },
+          { text:"« Surchauffe moteur, arrêt immédiat en sécurité. »", wrong:true },
+          { text:"« Petit bug écran, je vais tapoter dessus et ça repartira. »", near:true }
+        ],
+        onGood:{ message:"OK : demande de correction en garage transmise." },
+        onBad:{  message:"Formulation inadaptée → Game Over." }
+      },
+      repair:{ toQuiz:false, message:"Pas de réparation conducteur → Game Over." }
+    }
+  }
+,{
+  id:'defaut_airbag', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/241bry64xzu8aiz4rvvor/8.jpg?rlkey=8izj5e2urtctqgxcwdl80bj2a&st=c0qiv6y2&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Mauvais réflexe : système airbag potentiellement inopérant, à signaler." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l'exploitation ?",
+      choices:[
+        { text:"« Défaut airbag affiché : merci de prendre RDV pour réparation en garage. »", good:true },
+        { text:"« Je désactive tous les airbags, comme ça plus de défaut. »", fun:true },
+        { text:"« Voyant ceinture/portière : je vérifie que c’est fermé. »", wrong:true },
+        { text:"« Petit voyant airbag, on verra à la prochaine révision. »", near:true }
+      ],
+      onGood:{ message:"OK : demande de prise de RDV transmise." },
+      onBad:{  message:"Formulation inadaptée → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas de réparation conducteur sur un système airbag → Game Over." }
+  }
+},
+{
+  id:'defaut_charge_batt', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/fht1p4onro8ogknp18f4b/9.jpg?rlkey=ap18p442xr3fdmklscy5h2gzc&st=num7bkgk&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Risque de panne à court terme : mauvaise décision." },
+    call:{ toQuiz:false, message:"Diagnostic simple possible par le conducteur d’abord → Game Over si appel." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que peux-tu tenter (réparable niveau chauffeur) ?",
+      choices:[
+        { text:"Resserrer les cosses de batterie et vérifier la courroie d’alternateur.", good:true },
+        { text:"Débrancher la batterie en roulant pour ‘rebooter’.", fun:true },
+        { text:"Remplacer l’alternateur sur le bas-côté.", wrong:true },
+        { text:"Couper tous les consommateurs et continuer comme ça.", near:true }
+      ],
+      onGood:{ message:"Bien : action simple et sûre réalisée." },
+      onBad:{  message:"Action inadaptée/dangereuse → Game Over." }
+    }
+  }
+},
+{
+  id:'defaut_frein_parc', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/t5tr2ljihgc034s07kv26/13.jpg?rlkey=hnzwm1gnos3nqvi88vwslljj9&st=rcpwwwuz&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Frein de parc mal desserré : corriger l’action, ne pas continuer ainsi." },
+    call:{ toQuiz:false, message:"Inutile d’appeler pour ce cas → Game Over." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que peux-tu faire (niveau chauffeur) ?",
+      choices:[
+        { text:"Desserrer correctement le frein de parc (mal desserré) et vérifier l’extinction du voyant.", good:true },
+        { text:"Rouler avec le frein serré pour le ‘roder’.", fun:true },
+        { text:"Débrancher le capteur de frein de parc.", wrong:true },
+        { text:"Tirer plus fort sur la commande de frein de parc.", near:true }
+      ],
+      onGood:{ message:"OK : action corrective simple et sûre." },
+      onBad:{  message:"Action inadaptée → Game Over." }
+    }
+  }
+},
+{
+  id:'oubli_frein_parc_portes', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/ym6gzpeid32780ra6ltrk/14.jpg?rlkey=up6rgeb335b6od04f5728hl5u&st=fxi3exi8&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Mauvais réflexe : risque de sécurité à l’immobilisation." },
+    call:{ toQuiz:false, message:"Pas un sujet d’appel → Game Over." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que fais-tu ?",
+      choices:[
+        { text:"Mettre le frein de parc avant/avec l’ouverture des portes.", good:true },
+        { text:"Laisser en prise sans frein de parc, ça suffit.", fun:true },
+        { text:"Désactiver l’alarme dans le menu.", wrong:true },
+        { text:"Mettre une cale sous une roue et continuer.", near:true }
+      ],
+      onGood:{ message:"OK : bonne pratique d’immobilisation." },
+      onBad:{  message:"Action inadaptée → Game Over." }
+    }
+  }
+},
+{
+  id:'abs_defaut_systeme', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/9l8wmoiuw48fn6qel2qzp/15.jpg?rlkey=qxy04bt3rj5wqypoezvwfc6jk&st=10sdgv5z&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Alerte ABS : ne pas poursuivre." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l’exploitation ?",
+      choices:[
+        { text:"« Alerte ABS / défaut système : arrêt en sécurité et demande de dépannage. »", good:true },
+        { text:"« Je débranche un capteur ABS pour enlever le défaut. »", fun:true },
+        { text:"« Rien de grave, je continue normalement. »", wrong:true },
+        { text:"« Je roule très doucement jusqu’au dépôt sans prévenir. »", near:true }
+      ],
+      onGood:{ message:"OK : arrêt + demande d’assistance." },
+      onBad:{  message:"Formulation/choix inadapté → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas d’action conducteur sur le système ABS → Game Over." }
+  }
+},
+{
+  id:'pression_air_min_ebs_defaut', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/1sspcbvd6spx3cjnvoitl/16.jpg?rlkey=ozhbpxxxv3rmcs7k9bo2gl5kb&st=62j3jv2y&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Pression d’air insuffisante / EBS défaut : s’arrêter en sécurité." },
+    call:{ toQuiz:false, message:"D’abord sécuriser/contrôler, appeler si le défaut persiste → Game Over si appel direct." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que peux-tu tenter (niveau chauffeur) ?",
+      choices:[
+        { text:"S’arrêter en sécurité et attendre la remontée de pression d’air ; contrôle visuel (fuites, compresseur/courroie).", good:true },
+        { text:"Ajouter du liquide de frein.", fun:true },
+        { text:"Purger toutes les cuves au hasard.", wrong:true },
+        { text:"Continuer prudemment jusqu’à destination.", near:true }
+      ],
+      onGood:{ message:"OK : sécurité + contrôle appropriés." },
+      onBad:{  message:"Action inadaptée/dangereuse → Game Over." }
+    }
+  }
+},
+{
+  id:'esc_defaut_systeme', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/1yfb80e1bl8j558nvvmco/17.jpg?rlkey=m6v0p65khp2oli2olhneecb8n&st=c5lpjqv3&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Mauvais réflexe : défaut ESC à signaler." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l’exploitation ?",
+      choices:[
+        { text:"« Défaut ESC : merci de faire vérifier le système par le constructeur. »", good:true },
+        { text:"« Je vais ‘drifter’ pour tester si ça marche. »", fun:true },
+        { text:"« Défaut pression d’huile, arrêt immédiat. »", wrong:true },
+        { text:"« Petit voyant ESC, on verra à la prochaine révision. »", near:true }
+      ],
+      onGood:{ message:"OK : contrôle constructeur à planifier." },
+      onBad:{  message:"Formulation inadaptée → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas de réparation conducteur sur ESC → Game Over." }
+  }
+},
+{
+  id:'asr_desactive', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/x3pjvp5lz9j70k86izq1l/19.jpg?rlkey=e3ih0zzf9qszg9lqpnnc85591&st=oaqf35lc&raw=1',
+  flows:{
+    continue:{ ok:false, message:"ASR désactivé : mauvaise décision, à signaler pour contrôle." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l’exploitation ?",
+      choices:[
+        { text:"« ASR désactivé : merci de planifier un passage garage / contrôle. »", good:true },
+        { text:"« Je coupe aussi ABS et ESP pour que tout soit homogène. »", fun:true },
+        { text:"« Voyant pression d’huile rouge : arrêt moteur. »", wrong:true },
+        { text:"« ASR parfois inactif, on verra plus tard. »", near:true }
+      ],
+      onGood:{ message:"OK : contrôle en garage à planifier." },
+      onBad:{  message:"Formulation inadaptée → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas d’action conducteur fiable sur l’ASR → Game Over." }
+  }
+},
+{
+  id:'usure_plaquettes', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/j1m1ql38o7393yyatb74r/22.jpg?rlkey=i8a2fdmgvx7wnhylhix81e0gd&st=m1el1n5o&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Usure plaquettes : il faut programmer l’intervention." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l’exploitation ?",
+      choices:[
+        { text:"« Usure plaquettes frein : merci d’organiser le remplacement en garage. »", good:true },
+        { text:"« Je freine fort pour ‘les nettoyer’. »", fun:true },
+        { text:"« Voyant lave-glace, je remets du liquide. »", wrong:true },
+        { text:"« Alerte usure, on verra à la prochaine révision. »", near:true }
+      ],
+      onGood:{ message:"OK : remplacement à planifier." },
+      onBad:{  message:"Formulation inadaptée → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas d’intervention conducteur sur le remplacement de plaquettes → Game Over." }
+  }
+},
+{
+  id:'temp_plaquettes', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/ayclszdj4mq2j2nvqoy8r/23.jpg?rlkey=xwe50ago8qs4jljw5pk7sxwh9&st=x2c9u6er&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Température de plaquettes élevée : adapter immédiatement la conduite." },
+    call:{ toQuiz:false, message:"Pas d’appel d’emblée : d’abord corriger la conduite → Game Over si appel." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que peux-tu faire (niveau chauffeur) ?",
+      choices:[
+        { text:"Tomber un ou deux rapports et utiliser le frein moteur / ralentisseur, conduite douce pour refroidir.", good:true },
+        { text:"Arroser les freins à l’eau pour les refroidir vite.", fun:true },
+        { text:"Couper le contact pour ‘laisser reposer’ en roulant.", wrong:true },
+        { text:"Freiner très légèrement mais longtemps pour stabiliser la vitesse.", near:true }
+      ],
+      onGood:{ message:"OK : bonne gestion thermique par la conduite." },
+      onBad:{  message:"Action inadaptée/dangereuse → Game Over." }
+    }
+  }
+},
+{
+  id:'defaut_gestion_air', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/ul6xflprx0w58denlqg46/24.jpg?rlkey=thqoxgjirc556fvnc3wmey938&st=59xcm0wf&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Défaut gestion d’air : risque de dommages/panne si on continue." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l’exploitation ?",
+      choices:[
+        { text:"« Défaut gestion d’air : contacter immédiatement, passage garage à organiser (risque de dommages). »", good:true },
+        { text:"« Je débranche une durite d’air pour voir. »", fun:true },
+        { text:"« Simple rappel maintenance, pas urgent. »", wrong:true },
+        { text:"« Petite alerte d’air, on regarde ça en fin de semaine. »", near:true }
+      ],
+      onGood:{ message:"OK : signalement immédiat et organisation garage." },
+      onBad:{  message:"Formulation inadaptée → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas d’action conducteur sûre ici → Game Over." }
+  }
+},
+{
+  id:'charge_batt_traction', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/tsdevznn083yf2p2wxbht/25.jpg?rlkey=9tc1uf099v13fej5qdl2th0al&st=g70kztde&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Mauvais réflexe : témoin charge batteries de traction." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l’exploitation ?",
+      choices:[
+        { text:"« Témoin de charge batteries de traction : merci de contacter rapidement un représentant de la marque / passage garage. »", good:true },
+        { text:"« Je débranche tout le pack HV moi-même. »", fun:true },
+        { text:"« Voyant lave-glace : j’en remets. »", wrong:true },
+        { text:"« Petite alerte traction, on verra plus tard. »", near:true }
+      ],
+      onGood:{ message:"OK : signalement + consultation rapide de la marque." },
+      onBad:{  message:"Formulation inadaptée → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas d’intervention conducteur sûre ici → Game Over." }
+  }
+},
+{
+  id:'cordon_charge_branche', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/xk9l0hdxyhdgtp7m7u7tz/26.jpg?rlkey=r4wt09xujzerzbu7gjh0cc06g&st=gz7xd9et&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Cordon de charge branché : ne pas continuer." },
+    call:{ toQuiz:false, message:"Pas d’appel d’emblée : agir d’abord correctement → Game Over si appel." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que fais-tu ?",
+      choices:[
+        { text:"Arrêter immédiatement la charge puis débrancher le cordon selon la procédure (véhicule/borne).", good:true },
+        { text:"Arracher le câble pour gagner du temps.", fun:true },
+        { text:"Tenter de rouler cordon branché.", wrong:true },
+        { text:"Attendre la fin de charge complète sans rien faire.", near:true }
+      ],
+      onGood:{ message:"OK : cordon débranché en sécurité." },
+      onBad:{  message:"Action inadaptée/dangereuse → Game Over." }
+    }
+  }
+},
+{
+  id:'defaut_moteur_elec', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/dzijdg0181rafv73joyoc/28.jpg?rlkey=wzi65btintb2c87395hwmlrj4&st=vpdr56d4&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Défaut moteur électrique : ne pas poursuivre." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l’exploitation ?",
+      choices:[
+        { text:"« Défaut moteur électrique : arrêt immédiat et remorquage à organiser. »", good:true },
+        { text:"« Je coupe/remets le contact en roulant et je repars. »", fun:true },
+        { text:"« Simple rappel maintenance. »", wrong:true },
+        { text:"« Je continue doucement, on avisera au dépôt. »", near:true }
+      ],
+      onGood:{ message:"OK : arrêt + remorquage." },
+      onBad:{  message:"Formulation inadaptée → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas d’intervention conducteur sur le groupe électrique → Game Over." }
+  }
+},
+{
+  id:'defaut_AEBS', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/rg6sc2jwp0ohir2kievv3/29.jpg?rlkey=kqez2t7i8lcu92a3ofq5yrz6v&st=i82c3855&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Défaut AEBS : sécuriser d’abord." },
+    call:{ toQuiz:false, message:"D’abord vérifier/dégager capteurs, puis aviser → Game Over si appel direct." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que peux-tu tenter (niveau chauffeur) ?",
+      choices:[
+        { text:"S’arrêter en sécurité et s’assurer que caméra/radar sont propres et non obstrués (pare-brise, calandre).", good:true },
+        { text:"Masquer la caméra avec un ruban pour éviter les faux positifs.", fun:true },
+        { text:"Débrancher le radar pour ‘réinitialiser’.", wrong:true },
+        { text:"Continuer la tournée et on regardera plus tard.", near:true }
+      ],
+      onGood:{ message:"OK : vérification capteurs effectuée." },
+      onBad:{  message:"Action inadaptée → Game Over." }
+    }
+  }
+},
+{
+  id:'defaut_LDWS', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/gd8906iffkgfrnclk77x9/30.jpg?rlkey=1vvu5owcp961h4wq27wb5e1ar&st=lk7jf6mw&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Défaut LDWS : corriger la trajectoire, ne pas ignorer." },
+    call:{ toQuiz:false, message:"Pas d’appel d’emblée → corriger la conduite d’abord." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que fais-tu immédiatement ?",
+      choices:[
+        { text:"Recentrer le véhicule et le maintenir correctement au milieu de la voie.", good:true },
+        { text:"Désactiver toutes les aides à la conduite.", fun:true },
+        { text:"Changer de voie sans clignotant pour ‘tester’.", wrong:true },
+        { text:"Rouler au plus près de la ligne au sol.", near:true }
+      ],
+      onGood:{ message:"OK : conduite corrigée." },
+      onBad:{  message:"Action inadaptée → Game Over." }
+    }
+  }
+},
+{
+  id:'defaut_antivol_elec', isProblem:true,
+  img: 'https://www.dropbox.com/scl/fi/ua6pp4ex09gvt9omcz2yl/35.jpg?rlkey=piq1u6no8cekl03sztb5g55fz&st=i62b31kb&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Antivol électronique : vérifier d’abord la clé." },
+    call:{ toQuiz:false, message:"Pas d’appel d’emblée : contrôle clé/pile d’abord." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que peux-tu faire (niveau chauffeur) ?",
+      choices:[
+        { text:"Vérifier/remplacer la pile de la clé (ou essayer la clé de secours).", good:true },
+        { text:"Enlever l’antivol en shuntant les fils.", fun:true },
+        { text:"Forcer le neiman au tournevis.", wrong:true },
+        { text:"Secouer la clé et espérer.", near:true }
+      ],
+      onGood:{ message:"OK : vérification de la clé effectuée." },
+      onBad:{  message:"Action inadaptée → Game Over." }
+    }
+  }
+},
+{
+  id:'arret_moteur', isProblem:true,
+  img:'https://www.dropbox.com/scl/fi/0szjkjecni6faocetrban/37.jpg?rlkey=h81gwi232ytyktqxpn7mjmsy8&st=ntr3u422&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Alerte arrêt moteur : immobiliser le véhicule dès que possible." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l’exploitation ?",
+      choices:[
+        { text:"« Alerte arrêt moteur : immobilisation en sécurité, assistance/dépannage à organiser. »", good:true },
+        { text:"« Je redémarre plus fort, ça va repartir. »", fun:true },
+        { text:"« Voyant lave-glace, je remets du liquide. »", wrong:true },
+        { text:"« Petit voyant moteur, je continue doucement jusqu’au dépôt. »", near:true }
+      ],
+      onGood:{ message:"OK : immobilisation + demande d’assistance." },
+      onBad:{  message:"Formulation inadaptée → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas d’action conducteur ici → Game Over." }
+  }
+},
+{
+  id:'alerte_suspension_elec', isProblem:true,
+  img:'https://www.dropbox.com/scl/fi/yb958728dj4ry49o8fbis/40.jpg?rlkey=52e9ftljfb8dkdzdc9gbrt2qx&st=79osk7q7&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Alerte suspension pneumatique : ne pas ignorer." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l’exploitation ?",
+      choices:[
+        { text:"« Alerte suspension pneumatique électronique : passage garage proche pour réparer un coussin d’air. »", good:true },
+        { text:"« Je gonfle le coussin à la pompe à vélo. »", fun:true },
+        { text:"« Défaut ABS, distances d’arrêt allongées. »", wrong:true },
+        { text:"« Je continue doucement et on verra au dépôt. »", near:true }
+      ],
+      onGood:{ message:"OK : garage à organiser rapidement." },
+      onBad:{  message:"Formulation inadaptée → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas d’intervention conducteur fiable → Game Over." }
+  }
+},
+{
+  id:'ajuster_hauteur_route', isProblem:false,
+  img:'https://www.dropbox.com/scl/fi/gwn60uqcuxddcyr6oouhi/41.jpg?rlkey=m1ukqfhlqmyuj09kx7318zlc0&st=fg9uuuoa&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Hauteur non en position route : corriger d’abord." },
+    call:{ toQuiz:false, message:"Pas d’appel : action conducteur simple requise → Game Over si appel." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que fais-tu ?",
+      choices:[
+        { text:"Remettre la suspension en position route via la télécommande.", good:true },
+        { text:"Baisser au maximum pour ‘un meilleur look’.", fun:true },
+        { text:"Changer un coussin d’air sur place.", wrong:true },
+        { text:"Couper le contact et attendre que ça se règle seul.", near:true }
+      ],
+      onGood:{ message:"OK : position route rétablie." },
+      onBad:{  message:"Action inadaptée → Game Over." }
+    }
+  }
+},
+{
+  id:'defaut_eclairage', isProblem:true,
+  img:'https://www.dropbox.com/scl/fi/zllm4u3dg1hmf3hffi1ym/43.jpg?rlkey=7a4imegtrwk43tij80mopzaqd&st=lso9j9vp&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Défaut d’éclairage : à corriger avant de continuer." },
+    call:{ toQuiz:false, message:"Pas d’appel d’emblée si ampoule accessible → Game Over si appel." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que fais-tu (niveau chauffeur) ?",
+      choices:[
+        { text:"Contrôle des feux et remplacement de l’ampoule défectueuse (ou passage garage si impossible).", good:true },
+        { text:"Retirer un fusible au hasard pour ‘réinitialiser’.", fun:true },
+        { text:"Rouler en pleins phares partout pour compenser.", wrong:true },
+        { text:"Mettre les warnings en permanence.", near:true }
+      ],
+      onGood:{ message:"OK : éclairage rétabli / pris en charge." },
+      onBad:{  message:"Action inadaptée → Game Over." }
+    }
+  }
+},
+{
+  id:'blocage_differentiel_on', isProblem:false,
+  img:'https://www.dropbox.com/scl/fi/0aiqpk8jsjzynljlc83xk/44.jpg?rlkey=anoe62oqnz8aeyhloyoaj14hb&st=nksipk01&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Blocage différentiel activé : ne pas rester en usage route." },
+    call:{ toQuiz:false, message:"Pas un sujet d’appel : action conducteur attendue → Game Over si appel." },
+    repair:{
+      toQuiz:true,
+      prompt:"Que fais-tu ?",
+      choices:[
+        { text:"Désengager le blocage dès que le véhicule est sorti de la boue/zone à faible adhérence.", good:true },
+        { text:"Le laisser activé en permanence ‘au cas où’.", fun:true },
+        { text:"Débrancher le faisceau du différentiel.", wrong:true },
+        { text:"Rouler très doucement blocage enclenché jusqu’au dépôt.", near:true }
+      ],
+      onGood:{ message:"OK : blocage retiré au bon moment." },
+      onBad:{  message:"Action inadaptée → Game Over." }
+    }
+  }
+},
+{
+  id:'temp_huile_boite', isProblem:true,
+  img:'https://www.dropbox.com/scl/fi/69uhi3420czy9xccvqtry/50.jpg?rlkey=be2en4yhpwvli02yhj0f6mfr5&st=g7wqea7e&raw=1',
+  flows:{
+    continue:{ ok:false, message:"Température d’huile de boîte élevée : ne pas poursuivre." },
+    call:{
+      toQuiz:true,
+      prompt:"Que dis-tu à l’exploitation ?",
+      choices:[
+        { text:"« Alerte température huile de boîte : prévenir exploitation et amener le véhicule au garage pour vidange/remplacement d’huile. »", good:true },
+        { text:"« J’arrose la boîte à l’eau froide pour refroidir. »", fun:true },
+        { text:"« Voyant batterie, alternateur HS. »", wrong:true },
+        { text:"« Je continue doucement et on verra plus tard. »", near:true }
+      ],
+      onGood:{ message:"OK : passage garage à organiser rapidement." },
+      onBad:{  message:"Formulation inadaptée → Game Over." }
+    },
+    repair:{ toQuiz:false, message:"Pas d’intervention conducteur sûre ici → Game Over." }
+  }
+}
+];
+
+// Liste exercice (ordre imposé)
+let EXO_ORDER = [
+  'prealert_maint',
+  'info_defauts_presents',
+  'maint_non_active',
+  'alerte_maintenance',
+  'maint_active_non_init',
+  'echeance_maintenance',
+  'defaut_afficheur',
+  'defaut_airbag',
+  'defaut_charge_batt',
+  'defaut_frein_parc',
+  'oubli_frein_parc_portes',
+  'abs_defaut_systeme',
+  'pression_air_min_ebs_defaut',
+  'esc_defaut_systeme',
+  'asr_desactive',
+  'usure_plaquettes',
+  'temp_plaquettes',
+  'defaut_gestion_air',
+  'charge_batt_traction',
+  'cordon_charge_branche',
+  'defaut_moteur_elec',
+  'defaut_AEBS',
+  'defaut_LDWS',
+  'defaut_antivol_elec',
+  'arret_moteur',
+  'alerte_suspension_elec',
+  'ajuster_hauteur_route',
+  'defaut_eclairage',
+  'blocage_differentiel_on',
+  'temp_huile_boite'
+];
+
+// ---------- État ----------
+let mode='exercice';
+let qnum=1;
+let current=null;
+let stage='initial';
+
+const $pict=document.getElementById('pictogram');
+const $mech=document.getElementById('vMechanics');
+const $stage=document.getElementById('stage');
+const $opts=document.getElementById('opts');
+const $qnum=document.getElementById('qnum');
+const $stepLabel=document.getElementById('stepLabel');
+const $modeLabel=document.getElementById('modeLabel');
+const $sysMsg=document.getElementById('sysMsg');
+
+const $seg=document.getElementById('modeSeg');
+$seg.addEventListener('click',(e)=>{
+  const btn=e.target.closest('button'); if(!btn) return;
+  [...$seg.querySelectorAll('button')].forEach(b=>b.classList.toggle('active',b===btn));
+  mode=btn.dataset.mode; $modeLabel.textContent=mode.charAt(0).toUpperCase()+mode.slice(1);
+  start();
+});
+
+function pickNext(){
+  if(mode==='examen'){
+    const pool=BANK.filter(x=>x.isProblem);
+    current=pool[Math.floor(Math.random()*pool.length)]||BANK[0];
+  }else{ // exercice
+    if(qnum-1<EXO_ORDER.length){
+      const nextId=EXO_ORDER[qnum-1];
+      current=BANK.find(x=>x.id===nextId)||null;
+    }else{
+      current=null;
+    }
+  }
+}
+
+function start(){
+  qnum=1; stage='initial';
+  pickNext();
+  draw();
+}
+
+function draw(){
+  if(!current){
+    $stage.textContent='Fin de la série en mode Exercice.';
+    $opts.innerHTML='';
+    return;
+  }
+  $qnum.textContent=qnum;
+  $pict.src=current.img; $mech.textContent=current.mechanics||'';
+
+  $opts.innerHTML='';
+  if(stage==='initial'){
+    $stepLabel.textContent='Choix initial';
+    $stage.textContent='Que fais‑tu ?';
+    const initial=[
+      {text:'1) Ne rien faire et continuer la route', action:()=>handleInitial('continue')},
+      {text:'2) Appeler l\'exploitation', action:()=>handleInitial('call')},
+      {text:'3) Tenter une réparation rapide', action:()=>handleInitial('repair')},
+    ];
+    initial.forEach(i=>addBtn(i.text,i.action));
+  }
+  else if(stage==='callQuiz'){
+    $stepLabel.textContent='Appel exploitation';
+    $stage.textContent=current.flows.call.prompt || '—';
+    renderQuiz(current.flows.call);
+  }
+  else if(stage==='repairQuiz'){
+    $stepLabel.textContent='Réparation rapide';
+    $stage.textContent=current.flows.repair.prompt || '—';
+    renderQuiz(current.flows.repair);
+  }
+}
+
+function addBtn(text, onClick){
+  const b=document.createElement('button'); b.className='opt'; b.textContent=text; b.onclick=()=>{ onClick(); };
+  $opts.appendChild(b);
+}
+
+function handleInitial(kind){
+  if(kind==='continue'){
+    const act=current.flows.continue;
+    $sysMsg.textContent=act.message||'';
+    if(act.ok){ qnum++; pickNext(); stage='initial'; draw(); }
+    else{ gameOver(); }
+  }
+  if(kind==='call'){
+    const act=current.flows.call; if(!act.toQuiz){ gameOver(act.message||'Appel inutile → Game Over.'); return; }
+    stage='callQuiz'; draw();
+  }
+  if(kind==='repair'){
+    const act=current.flows.repair; if(!act.toQuiz){ gameOver(act.message||'Pas réparable par conducteur → Game Over.'); return; }
+    stage='repairQuiz'; draw();
+  }
+}
+
+function renderQuiz(block){
+  if(!block || !block.choices){ $opts.innerHTML=''; addBtn('↺ Recommencer', ()=>start()); return; }
+  const choices = shuffle(block.choices.slice());
+  $opts.innerHTML = '';
+  choices.forEach(ch=>{
+    addBtn('• ' + ch.text, ()=>{
+      if(ch.good){
+        $sysMsg.textContent = (block.onGood && block.onGood.message) || 'OK';
+        // question suivante
+        qnum++; pickNext(); stage='initial'; draw();
+      }else{
+        $sysMsg.textContent = (block.onBad && block.onBad.message) || 'Réponse incorrecte.';
+        gameOver();
+      }
+    });
+  });
+}
+
+function gameOver(msg){
+  stage='end';
+  $stepLabel.textContent='Fin';
+  $stage.textContent='Game Over';
+  if(msg) $sysMsg.textContent=msg;
+  $opts.innerHTML='';
+  addBtn('↺ Recommencer', ()=>start());
+}
+
+// ---------- Contrôles ----------
+const $prev=document.getElementById('prev');
+const $next=document.getElementById('next');
+const $restart=document.getElementById('restart');
+$prev.onclick=()=>history.back?.();
+$next.onclick=()=>{ qnum++; pickNext(); stage='initial'; draw(); };
+$restart.onclick=()=>start();
+
+// ---------- Bibliothèque ----------
+const $modal=document.getElementById('libModal');
+const $openLib=document.getElementById('openLib');
+const $closeLib=document.getElementById('closeLib');
+const openLib=()=>{ $modal.classList.add('open'); };
+const closeLib=()=>{ $modal.classList.remove('open') };
+$openLib.onclick=openLib; $closeLib.onclick=closeLib; $modal.onclick=(e)=>{ if(e.target===$modal) closeLib() };
+
+// ---------- Boot ----------
+start();
+</script>
+</body>
+</html>
