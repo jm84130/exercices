@@ -1,0 +1,1204 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tour du véhicule — Formation</title>
+<style>
+:root{
+  --gap:14px; --bg:#f7f7f9; --ink:#1c1d22; --muted:#6b6f76;
+  --line:#e6e7eb; --acc:#1f6feb; --card:#fff; --danger:#e10600;
+  --ctl-h:44px; --label-w:180px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,Segoe UI,Roboto,Arial}
+h1,h2,h3{margin:.2rem 0 .6rem} h2,h3{color:var(--acc)}
+.app{max-width:1100px;margin:auto;padding:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.grid{display:grid;gap:var(--gap)} .grid-2{grid-template-columns:1fr 1fr}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+label{display:block;font-weight:600;margin:.2rem 0}
+input[type="text"],input[type="number"],select{
+  width:100%;padding:0 .75rem;border:1px solid var(--line);border-radius:8px;
+  background:#fff;font-size:1rem;height:var(--ctl-h);line-height:var(--ctl-h)
+}
+input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type="number"]{-moz-appearance:textfield}
+.hint{color:var(--muted);font-size:.9rem}
+.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:.1rem .5rem;color:var(--muted);font-size:.85rem}
+.btn{appearance:none;border:1px solid var(--line);background:#fff;border-radius:10px;padding:.6rem 1rem;cursor:pointer}
+.btn.primary{background:var(--acc);color:#fff;border-color:var(--acc)} .btn[disabled]{opacity:.5;cursor:not-allowed}
+.hide{display:none !important}
+.kv{display:grid;grid-template-columns:220px 1fr;gap:10px}
+.kv-min{display:grid;grid-template-columns:160px 1fr 160px 1fr;gap:10px}
+@media (max-width:900px){.grid-2{grid-template-columns:1fr}.kv{grid-template-columns:1fr}.kv-min{grid-template-columns:1fr 1fr}}
+
+.wizard{display:grid;grid-template-columns:230px 1fr;gap:16px}
+.steps{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.step{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.step.active{background:#eef3ff;border-left:4px solid var(--acc)}
+.step.done{color:#1a7f37}
+.content{min-height:480px}
+.footer-actions{display:flex;justify-content:space-between;gap:10px;margin-top:10px}
+/* Barre d'actions du récap (imprimer / PDF) */
+.print-bar{
+  position: sticky;
+  bottom: -1px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  margin-top: 12px;
+  z-index: 5;
+}
+/* Carrosserie */
+.faces-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:900px){.faces-grid{grid-template-columns:1fr}}
+.stage{position:relative;width:100%;aspect-ratio:16/9;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+.stage img{width:100%;height:100%;object-fit:contain;display:block}
+.overlay{position:absolute;inset:0;cursor:crosshair}
+.mark{position:absolute;transform:translate(-50%,-50%);background:#1f6feb;color:#fff;font-size:.75rem;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+
+/* Recap images mêmes tailles */
+.face-stage{position:relative;width:100%;aspect-ratio:16/9;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.face-stage img{width:100%;height:100%;object-fit:contain;display:block}
+.rep-dot{position:absolute;transform:translate(-50%,-50%);background:#1f6feb;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:.75rem}
+
+/* Lignes (feux, niveaux, etc.) */
+.label-fixed{display:inline-block;width:var(--label-w);font-weight:700}
+.line{display:grid;grid-template-columns:var(--label-w) repeat(4,minmax(160px,1fr));gap:10px;align-items:center}
+.line>.inline{display:flex;align-items:center;gap:8px}
+.line input[type="text"], .line input[type="number"], .line select{width:100%}
+
+/* Pneus */
+.pneu-card{border:1px solid var(--line);border-radius:12px;padding:12px}
+.pneu-title{font-weight:700;margin-bottom:8px}
+.pneu-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* Jauges – 10 cm, responsives, pas de chevauchement */
+.gauge{
+  position:relative;
+  width:10cm;          /* demandé : 10 cm */
+  max-width:100%;      /* ne déborde jamais de la colonne */
+  height:24px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#f2f2f6;
+  cursor:pointer;
+  overflow:hidden;
+}
+.gauge>.bar{
+  position:absolute;
+  left:0; top:0; bottom:0;
+  width:0%;
+  border-radius:8px;
+  background:#00a35a;  /* la couleur est mise à jour en JS */
+}
+/* Lignes Niveaux : grille adaptée (Label | Type/Présence | Jauge) */
+.line.niv{ grid-template-columns: var(--label-w) 220px 1fr; }
+/* Conteneur “Jauge + %” propre */
+.gauge-wrap{ display:flex; align-items:center; gap:8px; min-width: 12rem; }
+
+/* Chargement – chaque ligne de chargement sur 2 lignes */
+.load-row{
+  display:grid;
+  grid-template-rows:auto auto;
+  gap:6px;
+  padding:8px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  margin-top:8px;
+}
+.load-row .top{
+  display:grid;
+  grid-template-columns: 110px 1fr 150px; /* Nombre | Nature (large) | Poids */
+  gap:10px; align-items:center;
+}
+.load-row .bottom{
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr 30px; /* Arrimage | Répartition | Calage | ✖ */
+  gap:10px; align-items:center;
+}
+.cross-del{
+  justify-self:end;
+  cursor:pointer;
+  color:var(--danger);
+  font-weight:700;
+  font-size:20px;
+  line-height:1;
+}
+
+/* Impression : propre & sans colonne de gauche */
+@media print{
+  body{background:#fff}
+  .no-print,.steps{display:none !important}
+  .wizard{grid-template-columns:1fr}
+  .app{max-width:960px}
+  .card{border:none;padding:0}
+  h1{margin-bottom:8px}
+  .faces-grid{gap:8px}
+  .face-stage{border-color:#ddd}
+  .section{page-break-inside:avoid;margin-bottom:10px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="row" style="justify-content:space-between">
+    <h1>Tour du véhicule — Formation</h1>
+    <span class="pill no-print">Assistant d’inspection</span>
+  </header>
+
+  <div class="wizard">
+    <nav class="steps no-print" id="steps-nav"></nav>
+    <main class="content card" id="step-content"></main>
+  </div>
+
+  <div class="footer-actions no-print" id="footer-bar">
+    <button class="btn" id="btn-prev" disabled>⟵ Précédent</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn primary" id="btn-next">Valider cette étape ⟶</button>
+    </div>
+  </div>
+
+  <p class="hint" style="margin-top:8px">logiciel proposé et créé par M. CHAZEL — Lycée professionnel Les Alpilles, Miramas</p>
+</div>
+<script>
+/* ========== Helpers & refs ========== */
+function $(s){return document.querySelector(s)}
+function $$(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
+function esc(v){v=v==null?"":String(v);return v.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}
+function todayISO(){return new Date().toISOString().slice(0,10)}
+var elNav=$("#steps-nav"), elContent=$("#step-content"), btnPrev=$("#btn-prev"), btnNext=$("#btn-next"), footerBar=$("#footer-bar");
+
+/* ========== Carrosserie images ========== */
+var IMAGE_SOURCES={
+  voiture:{avant:"https://www.dropbox.com/scl/fi/9bwyzwtbdz2br9h5we6dm/voiture-avant.JPG?rlkey=ao0891b5mvea1i7e8smxk53g6&dl=0&raw=1",
+           gauche:"https://www.dropbox.com/scl/fi/dg2i8sydz3727uggqujf1/voiture-gauche.JPG?rlkey=e1imy273p77y2o8jmrcfajfba&dl=0&raw=1",
+           droite:"https://www.dropbox.com/scl/fi/0jdvqirzwwolsni5z6ttd/voiture-droite.JPG?rlkey=2dz0ie2tdzdlyq68a9ebsbaxy&dl=0&raw=1",
+           arriere:"https://www.dropbox.com/scl/fi/7qap1xzwbovpgnr7qyb3q/voiture-arriere.JPG?rlkey=r67z0a0594hbch1x7vhoncl7p&dl=0&raw=1"},
+  porteur:{avant:"https://www.dropbox.com/scl/fi/jciszm717er3ls19hhfe5/porteur-avant.JPG?rlkey=2aii3ter4taayvmhj447g6tr0&dl=0&raw=1",
+           gauche:"https://www.dropbox.com/scl/fi/az3nnm3yc6x3ehzlz74fh/porteur-gauche.JPG?rlkey=8ypu0k7qeo539unxe3kk96p7j&dl=0&raw=1",
+           droite:"https://www.dropbox.com/scl/fi/8wmo8cxi4utogced752z3/porteur-droit.JPG?rlkey=k4v0dba807citn7pd7rqvbl3p&dl=0&raw=1",
+           arriere:"https://www.dropbox.com/scl/fi/xld55sqii5tyh8i0sxswu/camion-arriere.JPG?rlkey=ikevg4m24468s4ib5prh8xjjq&dl=0&raw=1"},
+  tracteur:{avant:"https://www.dropbox.com/scl/fi/wybn81vjja92yasabkhn5/camion-tracteur-avant.JPG?rlkey=r16gxk9o04gctsrozwz0z0bjn&dl=0&raw=1",
+            gauche:"https://www.dropbox.com/scl/fi/jmms3ryqnsl6n1typ5qwt/tracteur-gauche.JPG?rlkey=bqxkj9oit15nn1v03dze0up31&dl=0&raw=1",
+            droite:"https://www.dropbox.com/scl/fi/tmjrtby8hzwxvzpg3hh5x/tracteur-droit.JPG?rlkey=l8e8xzsv4iycinhqtotihmult&dl=0&raw=1",
+            arriere:"https://www.dropbox.com/scl/fi/wcpt3arllqsphgtmw2mqu/tracteur-arriere.JPG?rlkey=6tr5ut5by6s30ca31wfjjwccs&dl=0&raw=1"},
+  remorque:{avant:"https://www.dropbox.com/scl/fi/ubhw8ywpbqf4adeb1cjrg/semi-avant.JPG?rlkey=v7gpen55ce3842a0797kq669p&dl=0&raw=1",
+            gauche:"https://www.dropbox.com/scl/fi/4g32ec8egv79zc9ubzuvo/remorque-gauche.JPG?rlkey=ufqzu9mxrmpfnxbmyan874e9i&dl=0&raw=1",
+            droite:"https://www.dropbox.com/scl/fi/fa99armk4726cqvfi3z06/remorque-droite.JPG?rlkey=5mip0djh5wh8bfunesu6ual0r&dl=0&raw=1",
+            arriere:"https://www.dropbox.com/scl/fi/xld55sqii5tyh8i0sxswu/camion-arriere.JPG?rlkey=ikevg4m24468s4ib5prh8xjjq&dl=0&raw=1"},
+  semi:{avant:"https://www.dropbox.com/scl/fi/ubhw8ywpbqf4adeb1cjrg/semi-avant.JPG?rlkey=v7gpen55ce3842a0797kq669p&dl=0&raw=1",
+        gauche:"https://www.dropbox.com/scl/fi/98fqcnyiq2zsh8skcbnj0/semi-gauche.JPG?rlkey=3rnmpqvp26v1y6svc3y0xdu0b&dl=0&raw=1",
+        droite:"https://www.dropbox.com/scl/fi/n72h8d3nvuxqdeteicrin/semi-droite.JPG?rlkey=3j83rywj8rj7kfu8f9m4wl219&dl=0&raw=1",
+        arriere:"https://www.dropbox.com/scl/fi/xld55sqii5tyh8i0sxswu/camion-arriere.JPG?rlkey=ikevg4m24468s4ib5prh8xjjq&dl=0&raw=1"}
+};
+
+/* ========== State ========== */
+var state={
+  stepIdx:0,
+  setup:{type:"",carrosserie:"",boite:"",immat:"",marque:"",modele:"",puissance:"",km:"",horametre:"",essieux:"",tare:{pv:"",ptac:"",ptra:"",L:"",l:""}},
+  docs:null,
+  faces:{avant:[],gauche:[],droite:[],arriere:[],none:{avant:false,gauche:false,droite:false,arriere:false}},
+  pneus:{},feux:[],vitrages:null,retros:null,niveaux:null,portes:[],chg:null
+};
+
+/* ========== Steps ========== */
+var STEPS=[
+  {key:"setup",label:"Paramétrage"},
+  {key:"docs",label:"Documents & accessoires"},
+  {key:"carrosserie",label:"Inspection de carrosserie"},
+  {key:"pneus",label:"Pneumatiques"},
+  {key:"feux",label:"Feux"},
+  {key:"vitrages",label:"Vitrages"},
+  {key:"retros",label:"Rétroviseurs"},
+  {key:"niveaux",label:"Niveaux"},
+  {key:"portes",label:"Portes"},
+  {key:"chargement",label:"Chargement"},
+  {key:"recap",label:"Récapitulatif"}
+];
+
+/* ========== Navigation ========== */
+function renderNav(){
+  elNav.innerHTML = STEPS.map(function(s,i){
+    var cls=["step",i===state.stepIdx?"active":"",i<state.stepIdx?"done":""].join(" ");
+    return '<div class="'+cls+'" data-i="'+i+'">'+(i+1)+". "+s.label+'</div>';
+  }).join("");
+  $$(".step").forEach(function(n){
+    n.onclick=function(){var i=+n.getAttribute("data-i"); if(i<=state.stepIdx) goStep(i);}
+  });
+}
+function setNextText(){btnNext.textContent=(STEPS[state.stepIdx].key==="recap")?"Récapitulatif":"Valider cette étape ⟶"}
+function toggleFooter(){footerBar.style.display=(STEPS[state.stepIdx].key==="recap")?"none":"flex"}
+function goStep(i){state.stepIdx=i;renderNav();renderStepSafe();btnPrev.disabled=(i===0);setNextText();toggleFooter();elContent.scrollIntoView({behavior:"smooth",block:"start"})}
+function renderStepSafe(){try{renderStep()}catch(e){console.error(e);elContent.innerHTML='<div class="card"><h3>Erreur</h3><p class="hint">'+esc(e.message)+'</p></div>'}}
+btnPrev.onclick=function(){if(state.stepIdx>0)goStep(state.stepIdx-1)}
+btnNext.onclick=function(){if(!validateCurrentStep())return; if(state.stepIdx<STEPS.length-1)goStep(state.stepIdx+1)}
+document.addEventListener("DOMContentLoaded",function(){renderNav();renderStepSafe();setNextText();toggleFooter()})
+
+/* ========== Validation ========== */
+function isVisible(el){return !!(el&&el.offsetParent!==null)}
+function requireFilled(root){root=root||elContent;var f=[].slice.call(root.querySelectorAll(".require-choice")).filter(x=>isVisible(x)&&!x.disabled);
+  return f.every(function(e){if(e.tagName==="SELECT")return !!e.value;if(e.type==="number"||e.type==="date")return e.value!=="";return !!(e.value&&e.value.trim())})}
+function validateCurrentStep(){
+  var k=STEPS[state.stepIdx].key;
+  if(k==="setup"){
+    var t=$("#type")?$("#type").value:"";
+    var okBasic=["type","immat","marque","modele","boite","km"].every(id=>{var e=$("#"+id);return e&&String(e.value).trim()});
+    var needCarro=!$("#wrap-carrosserie").classList.contains("hide"), okCarro=needCarro?!!$("#carrosserie").value:true;
+    var needPow=(t==="porteur"||t==="tracteur"), okPow=needPow?!!$("#puissance").value:true;
+    var ok=okBasic&&okCarro&&okPow&&requireFilled(); if(!ok){alert("Complète les champs requis.");return false} return true;
+  }
+  if(k==="carrosserie"){
+    var F=["avant","gauche","droite","arriere"];
+    for(var i=0;i<F.length;i++){var f=F[i];if(!(state.faces.none[f]||(state.faces[f]&&state.faces[f].length>0))){alert("Pose un repère ou coche « Aucune anomalie » sur chaque vue.");return false}}
+    return true;
+  }
+  if(!requireFilled()){alert("Complète les champs visibles requis.");return false}
+  return true;
+}
+
+/* ========== Router ========== */
+function renderStep(){
+  var k=STEPS[state.stepIdx].key;
+  if(k==="setup") return renderSetup();
+  if(k==="docs") return renderDocs();
+  if(k==="carrosserie") return renderCarrosserie();
+  if(k==="pneus") return (window.renderPneus||stub)("pneus");
+  if(k==="feux") return (window.renderFeux||stub)("feux");
+  if(k==="vitrages") return (window.renderVitrages||stub)("vitrages");
+  if(k==="retros") return (window.renderRetros||stub)("retros");
+  if(k==="niveaux") return (window.renderNiveaux||stub)("niveaux");
+  if(k==="portes") return (window.renderPortes||stub)("portes");
+  if(k==="chargement") return (window.renderChargement||stub)("chargement");
+  if(k==="recap") return (window.renderRecap||stub)("recap");
+}
+function stub(name){elContent.innerHTML='<div class="card"><h3>'+name+'</h3><p class="hint">Cette section arrive ensuite.</p></div>'}
+
+/* ========== Paramétrage (placeholders) ========== */
+function renderSetup(){
+  var S=state.setup;
+  elContent.innerHTML=
+  '<div class="card"><h3>1) Paramétrage du véhicule</h3><div class="grid grid-2">'+
+    '<div><label for="type">Type de véhicule *</label><select id="type" class="require-choice">'+
+      '<option value="">— Choisir —</option>'+
+      '<option value="voiture"'+(S.type==="voiture"?" selected":"")+'>Voiture</option>'+
+      '<option value="porteur"'+(S.type==="porteur"?" selected":"")+'>Porteur</option>'+
+      '<option value="tracteur"'+(S.type==="tracteur"?" selected":"")+'>Tracteur routier</option>'+
+      '<option value="remorque"'+(S.type==="remorque"?" selected":"")+'>Remorque</option>'+
+      '<option value="semi"'+(S.type==="semi"?" selected":"")+'>Semi-remorque</option></select></div>'+
+    '<div id="wrap-carrosserie"><label for="carrosserie">Carrosserie</label><select id="carrosserie" class="require-choice"></select></div>'+
+    '<div><label for="immat">Immatriculation *</label><input id="immat" class="require-choice" placeholder="ex : AB-123-CD" value="'+esc(S.immat)+'"></div>'+
+    '<div><label for="marque">Marque *</label><input id="marque" class="require-choice" placeholder="ex : Renault" value="'+esc(S.marque)+'"></div>'+
+    '<div><label for="modele">Modèle *</label><input id="modele" class="require-choice" placeholder="ex : Clio IV" value="'+esc(S.modele)+'"></div>'+
+    '<div><label for="boite">Boîte de vitesses *</label><select id="boite" class="require-choice">'+
+      '<option value="">— Choisir —</option><option'+(S.boite==="Manuelle"?" selected":"")+'>Manuelle</option><option'+(S.boite==="Robotisée"?" selected":"")+'>Robotisée</option></select></div>'+
+    '<div id="wrap-puissance"><label for="puissance">Puissance (ch)</label><input id="puissance" type="number" placeholder="ex : 110" value="'+esc(S.puissance)+'"></div>'+
+    '<div><label for="km">Kilométrage (km) *</label><input id="km" type="number" class="require-choice" placeholder="ex : 152340" value="'+esc(S.km)+'"></div>'+
+    '<div id="wrap-hr"><label for="horametre">Horamètre (h)</label><input id="horametre" type="number" placeholder="ex : 3240" value="'+esc(S.horametre)+'"></div>'+
+    '<div id="wrap-essieux"><label for="essieux">Nombre d’essieux</label><input id="essieux" type="number" min="1" max="5" step="1" placeholder="ex : 2" value="'+esc(S.essieux)+'"></div>'+
+    '<fieldset id="wrap-tare" class="card" style="grid-column:1/-1"><legend><strong>Plaque de tare</strong></legend><div class="kv">'+
+      '<label>PV (kg)</label><input id="pv" type="number" placeholder="ex : 1450" value="'+esc(S.tare.pv)+'">'+
+      '<label>PTAC (kg)</label><input id="ptac" type="number" placeholder="ex : 3500" value="'+esc(S.tare.ptac)+'">'+
+      '<label>PTRA (kg)</label><input id="ptra" type="number" placeholder="ex : 6000" value="'+esc(S.tare.ptra)+'">'+
+      '<label>Longueur (m)</label><input id="longueur" type="number" step="0.01" placeholder="ex : 4.05" value="'+esc(S.tare.L)+'">'+
+      '<label>Largeur (m)</label><input id="largeur" type="number" step="0.01" placeholder="ex : 1.78" value="'+esc(S.tare.l)+'"></div></fieldset>'+
+  '</div></div>';
+
+  var selType=$("#type"), selCar=$("#carrosserie"),
+      wrapCar=$("#wrap-carrosserie"), wrapPuiss=$("#wrap-puissance"),
+      wrapHr=$("#wrap-hr"), wrapEss=$("#wrap-essieux"), wrapTare=$("#wrap-tare");
+  function refreshByType(){
+    var t=selType.value;
+    if(t==="voiture"){wrapCar.classList.remove("hide"); selCar.innerHTML='<option value="">— Choisir —</option><option value="berline"'+(S.carrosserie==="berline"?" selected":"")+'>Berline</option><option value="coupe"'+(S.carrosserie==="coupe"?" selected":"")+'>Coupé</option><option value="break"'+(S.carrosserie==="break"?" selected":"")+'>Break</option><option value="suv"'+(S.carrosserie==="suv"?" selected":"")+'>SUV</option>'}
+    else if(t==="tracteur"){wrapCar.classList.add("hide"); selCar.innerHTML='<option value="">—</option>'}
+    else if(t){wrapCar.classList.remove("hide"); selCar.innerHTML='<option value="">— Choisir —</option><option value="bache"'+(S.carrosserie==="bache"?" selected":"")+'>Bâché</option><option value="fourgon"'+(S.carrosserie==="fourgon"?" selected":"")+'>Fourgon</option>'}
+    else {wrapCar.classList.remove("hide"); selCar.innerHTML='<option value="">— Choisir —</option>'}
+    var isPL=(t==="porteur"||t==="tracteur"); wrapPuiss.classList.toggle("hide",!isPL);
+    wrapHr.classList.toggle("hide",!isPL); wrapEss.classList.toggle("hide",t==="voiture"||!t); wrapTare.classList.toggle("hide",t==="voiture"||!t);
+  }
+  elContent.addEventListener("input",function(e){
+    var id=e.target.id; if(!id) return;
+    if(["type","carrosserie","boite","immat","marque","modele","puissance","km","horametre","essieux"].indexOf(id)>-1){state.setup[id]=e.target.value}
+    if(["pv","ptac","ptra","longueur","largeur"].indexOf(id)>-1){var map={longueur:"L",largeur:"l"}; state.setup.tare[map[id]||id]=e.target.value}
+  });
+  selType.addEventListener("change",refreshByType); refreshByType();
+}
+
+/* ========== Documents & accessoires (avec goupille extincteur) ========== */
+function renderDocs(){
+  var t=state.setup.type, isPL=(t==="porteur"||t==="tracteur");
+  if(!state.docs){
+    state.docs={
+      ci:{present:"",ctLettre:"",ctDate:""},
+      assur:{present:"",date:""},
+      constat:{present:""}, carte:{present:""}, ethylo:{present:""}, gilet:{present:""}, manuel:{present:""},
+      taxe:isPL?{present:"",tampon:""}:null,
+      extincteur:isPL?{present:"",goupille:""}:null
+    };
+  }
+  var D=state.docs, yesNo='<option value="">—</option><option>Oui</option><option>Non</option>';
+  elContent.innerHTML=
+  '<div class="card"><h3>2) Documents & accessoires</h3>'+
+    '<div class="line"><span class="label-fixed"><strong>Certificat immatriculation</strong></span>'+
+      '<label class="inline"><span>Présence</span><select id="ci-pres" class="require-choice">'+yesNo.replace(">"+D.ci.present+"<"," selected>"+D.ci.present+"<")+'</select></label>'+
+      '<label class="inline ci-extra '+(D.ci.present==="Oui"?"":"hide")+'"><span>CT (A/S/R)</span><select id="ci-ct" class="require-choice"><option value="">—</option><option'+(D.ci.ctLettre==="A"?" selected":"")+'>A</option><option'+(D.ci.ctLettre==="S"?" selected":"")+'>S</option><option'+(D.ci.ctLettre==="R"?" selected":"")+'>R</option></select></label>'+
+      '<label class="inline ci-extra '+(D.ci.present==="Oui"?"":"hide")+'"><span>Validité CT</span><input id="ci-date" type="date" class="require-choice" value="'+esc(D.ci.ctDate)+'"></label></div>'+
+    '<div class="line"><span class="label-fixed"><strong>Certificat d’assurance</strong></span>'+
+      '<label class="inline"><span>Présence</span><select id="as-pres" class="require-choice">'+yesNo.replace(">"+D.assur.present+"<"," selected>"+D.assur.present+"<")+'</select></label>'+
+      '<label class="inline as-extra '+(D.assur.present==="Oui"?"":"hide")+'"><span>Validité</span><input id="as-date" type="date" class="require-choice" value="'+esc(D.assur.date)+'"></label></div>'+
+    '<div class="line"><span class="label-fixed"><strong>Constat amiable</strong></span><label class="inline"><span>Présence</span><select id="ctt-pres" class="require-choice">'+yesNo.replace(">"+D.constat.present+"<"," selected>"+D.constat.present+"<")+'</select></label></div>'+
+    '<div class="line"><span class="label-fixed"><strong>Carte routière / GPS</strong></span><label class="inline"><span>Présence</span><select id="car-pres" class="require-choice">'+yesNo.replace(">"+D.carte.present+"<"," selected>"+D.carte.present+"<")+'</select></label></div>'+
+    '<div class="line"><span class="label-fixed"><strong>Éthylotest</strong></span><label class="inline"><span>Présence</span><select id="eth-pres" class="require-choice">'+yesNo.replace(">"+D.ethylo.present+"<"," selected>"+D.ethylo.present+"<")+'</select></label></div>'+
+    '<div class="line"><span class="label-fixed"><strong>Gilet haute visibilité</strong></span><label class="inline"><span>Présence</span><select id="gil-pres" class="require-choice">'+yesNo.replace(">"+D.gilet.present+"<"," selected>"+D.gilet.present+"<")+'</select></label></div>'+
+    '<div class="line"><span class="label-fixed"><strong>Manuel d’utilisation</strong></span><label class="inline"><span>Présence</span><select id="man-pres" class="require-choice">'+yesNo.replace(">"+D.manuel.present+"<"," selected>"+D.manuel.present+"<")+'</select></label></div>'+
+    (isPL?
+      '<div class="line"><span class="label-fixed"><strong>Taxe à l’essieu</strong></span>'+
+        '<label class="inline"><span>Présence</span><select id="tax-pres" class="require-choice">'+yesNo.replace(">"+D.taxe.present+"<"," selected>"+D.taxe.present+"<")+'</select></label>'+
+        '<label class="inline tax-extra '+(D.taxe.present==="Oui"?"":"hide")+'"><span>Tampon douane</span><select id="tax-tmp" class="require-choice">'+yesNo.replace(">"+(D.taxe.tampon||"")+"<"," selected>"+(D.taxe.tampon||"")+"<")+'</select></label></div>'+
+      '<div class="line"><span class="label-fixed"><strong>Extincteur</strong></span>'+
+        '<label class="inline"><span>Présence</span><select id="ext-pres" class="require-choice">'+yesNo.replace(">"+D.extincteur.present+"<"," selected>"+D.extincteur.present+"<")+'</select></label>'+
+        '<label class="inline ext-extra '+(D.extincteur.present==="Oui"?"":"hide")+'"><span>Goupille</span><select id="ext-gou" class="require-choice">'+yesNo.replace(">"+(D.extincteur.goupille||"")+"<"," selected>"+(D.extincteur.goupille||"")+"<")+'</select></label></div>'
+      : ''
+    )+
+  '</div>';
+  elContent.onchange=function(e){
+    var id=e.target.id,v=e.target.value;
+    if(id==="ci-pres"){D.ci.present=v; $$(".ci-extra").forEach(x=>x.classList.toggle("hide",v!=="Oui"))}
+    if(id==="ci-ct") D.ci.ctLettre=v;
+    if(id==="ci-date") D.ci.ctDate=v;
+    if(id==="as-pres"){D.assur.present=v; $$(".as-extra").forEach(x=>x.classList.toggle("hide",v!=="Oui"))}
+    if(id==="as-date") D.assur.date=v;
+    if(id==="ctt-pres") D.constat.present=v;
+    if(id==="car-pres") D.carte.present=v;
+    if(id==="eth-pres") D.ethylo.present=v;
+    if(id==="gil-pres") D.gilet.present=v;
+    if(id==="man-pres") D.manuel.present=v;
+    if(id==="tax-pres"){D.taxe.present=v; $$(".tax-extra").forEach(x=>x.classList.toggle("hide",v!=="Oui"))}
+    if(id==="tax-tmp") D.taxe.tampon=v;
+    if(id==="ext-pres"){D.extincteur.present=v; $$(".ext-extra").forEach(x=>x.classList.toggle("hide",v!=="Oui"))}
+    if(id==="ext-gou") D.extincteur.goupille=v;
+  };
+}
+
+/* ========== Carrosserie (repères) ========== */
+function renderCarrosserie(){
+  var t=state.setup.type||"voiture",srcs=IMAGE_SOURCES[t]||IMAGE_SOURCES.voiture;
+  elContent.innerHTML='<div class="card"><h3>3) Inspection de carrosserie</h3><p class="hint">Clique sur une image pour poser un repère ou coche « Aucune anomalie ».</p><div class="grid grid-2">'+
+    ["avant","gauche","droite","arriere"].map(f=>faceBlock(f,srcs[f])).join("")+'</div></div>';
+  ["avant","gauche","droite","arriere"].forEach(bindFaceOverlay);
+}
+function faceBlock(face,src){
+  var none=state.faces.none[face],list=state.faces[face]||[];
+  return '<div class="face-box card"><div class="row" style="justify-content:space-between"><strong>'+labelFace(face)+'</strong>'+
+    '<label class="row" style="gap:6px"><input type="checkbox" class="chk-none" data-face="'+face+'"'+(none?' checked':'')+'><span class="pill">Aucune anomalie</span></label></div>'+
+    '<div class="stage"><img src="'+src+'" alt="'+labelFace(face)+'"><div class="overlay" data-face="'+face+'"></div>'+list.map(dotTpl).join("")+'</div>'+
+    '<div class="mlist">'+(list.length?list.map(liTpl).join(""):'<p class="hint">Aucun repère.</p>')+'</div></div>';
+}
+function labelFace(k){return {avant:"Avant",gauche:"Côté gauche",droite:"Côté droit",arriere:"Arrière"}[k]||k}
+function dotTpl(m){return '<div class="mark" style="left:'+m.xPct+'%;top:'+m.yPct+'%">'+m.id+'</div>'}
+function liTpl(m){return '<div class="row" style="justify-content:space-between"><span>#'+m.id+' — '+(m.note?esc(m.note):"(sans note)")+'</span><button class="btn" data-del="'+m.id+'" data-face="'+m.face+'">Supprimer</button></div>'}
+function bindFaceOverlay(face){
+  var box=elContent.querySelector('.overlay[data-face="'+face+'"]'); var noneChk=elContent.querySelector('.chk-none[data-face="'+face+'"]');
+  box.onclick=function(e){var r=box.getBoundingClientRect(),x=Math.round(((e.clientX-r.left)/r.width)*1000)/10,y=Math.round(((e.clientY-r.top)/r.height)*1000)/10,id=nextMarkerId(),note=prompt('Commentaire pour le repère #'+id+' ('+labelFace(face)+') ?')||""; if(!state.faces[face])state.faces[face]=[]; state.faces[face].push({id,xPct:x,yPct:y,note,face}); state.faces.none[face]=false; renderCarrosserie()}
+  $$('.btn[data-face="'+face+'"][data-del]').forEach(function(b){b.onclick=function(){var id=+b.getAttribute("data-del"); state.faces[face]=(state.faces[face]||[]).filter(m=>m.id!==id); renderCarrosserie()}})
+  noneChk.onchange=function(){state.faces.none[face]=noneChk.checked; if(noneChk.checked) state.faces[face]=[]; renderCarrosserie()}
+}
+function nextMarkerId(){var max=0;["avant","gauche","droite","arriere"].forEach(f=>{(state.faces[f]||[]).forEach(m=>{if(m.id>max)max=m.id})}); return max+1}
+</script>
+<script>
+/* ====== Options communes ====== */
+var OPT_ETAT_BM =
+  '<option value="">— Faites votre choix —</option><option>Bon</option><option>Mauvais</option>';
+var OPT_PROP_FULL =
+  '<option value="">— Faites votre choix —</option><option>Propre</option><option>Sale</option><option>Givré</option><option>Obstrué</option>';
+
+/* ====================== PNEUS ====================== */
+function renderPneus(){
+  var t=state.setup.type, isPL=(t==="porteur"||t==="tracteur"), isTrailer=(t==="remorque"||t==="semi");
+  var nb=parseInt(state.setup.essieux||"2",10);
+  var pos=(isTrailer&&nb>=3)?["AV_G","AV_D","CENTRE_G","CENTRE_D","AR_G","AR_D"]:["AV_G","AV_D","AR_G","AR_D"];
+  var lib={AV_G:"Avant G",AV_D:"Avant D",CENTRE_G:"Centre G",CENTRE_D:"Centre D",AR_G:"Arrière G",AR_D:"Arrière D"};
+  elContent.innerHTML='<div class="card"><h3>4) Pneumatiques</h3><div class="grid">'+
+    pos.map(function(p){return pneuCard(p,lib[p],isPL)}).join("")+'</div></div>';
+  elContent.onchange=function(e){
+    var p=e.target.getAttribute("data-pos"), f=e.target.getAttribute("data-f"); if(!p||!f) return;
+    state.pneus[p]=state.pneus[p]||{}; state.pneus[p][f]=e.target.value;
+  };
+}
+function pneuCard(pos,label,isPL){
+  var d=state.pneus[pos]||{}, jum=(isPL&&(pos==="AR_G"||pos==="AR_D"));
+  return '<div class="pneu-card"><div class="pneu-title">'+label+'</div>'+
+    '<div class="pneu-grid">'+
+      '<div><label>Marque</label><input data-pos="'+pos+'" data-f="marque" placeholder="ex : Michelin" value="'+esc(d.marque)+'"></div>'+
+      '<div><label>Dimension</label><input data-pos="'+pos+'" data-f="dimension" placeholder="ex : 205/55R16" value="'+esc(d.dimension)+'"></div>'+
+      '<div><label>Pression</label><select data-pos="'+pos+'" data-f="pression" class="require-choice">'+
+        '<option value="">— Faites votre choix —</option><option'+(d.pression==="Bonne"?' selected':'')+'>Bonne</option><option'+(d.pression==="Mauvaise"?' selected':'')+'>Mauvaise</option></select></div>'+
+      '<div><label>Hernie</label><select data-pos="'+pos+'" data-f="hernie" class="require-choice">'+
+        '<option value="">— Faites votre choix —</option><option'+(d.hernie==="Non"?' selected':'')+'>Non</option><option'+(d.hernie==="Oui"?' selected':'')+'>Oui</option></select></div>'+
+      '<div><label>Déchirure</label><select data-pos="'+pos+'" data-f="dechirure" class="require-choice">'+
+        '<option value="">— Faites votre choix —</option><option'+(d.dechirure==="Non"?' selected':'')+'>Non</option><option'+(d.dechirure==="Oui"?' selected':'')+'>Oui</option></select></div>'+
+      '<div><label>Corps étranger (bande)</label><select data-pos="'+pos+'" data-f="corpsBande" class="require-choice">'+
+        '<option value="">— Faites votre choix —</option><option'+(d.corpsBande==="Non"?' selected':'')+'>Non</option><option'+(d.corpsBande==="Oui"?' selected':'')+'>Oui</option></select></div>'+
+      (jum?'<div style="grid-column:1/-1"><label>Corps étranger (entre jumelés)</label><select data-pos="'+pos+'" data-f="entreJum" class="require-choice">'+
+        '<option value="">— Faites votre choix —</option><option'+(d.entreJum==="Non"?' selected':'')+'>Non</option><option'+(d.entreJum==="Oui"?' selected':'')+'>Oui</option></select></div>':'')+
+    '</div></div>';
+}
+
+/* ====================== FEUX (ordre exact + règles par type) ====================== */
+/* ====================== FEUX (ordre exact + règles par type) ====================== */
+function renderFeux(){
+  var t = state.setup.type || "";
+  var isTrailer = (t === "remorque" || t === "semi");
+
+  /* 1) Liste — ORDRE EXACT (ta liste) */
+  var BASE = [
+    {lib:"Feux de position",               code:"position"},
+    {lib:"Feux de croisement",             code:"croisement"},
+    {lib:"Feux de route",                  code:"route"},
+    {lib:"Feux de caisse",                 code:"caisse"},
+    {lib:"Feux de cabine",                 code:"cabine"},
+    {lib:"Feux de clignotant droit",       code:"clignotant_dr"},
+    {lib:"Feux de répétiteur clignotant droit", code:"rep_clignotant_dr"},
+    {lib:"Feux de clignotant gauche",      code:"clignotant_ga"},
+    {lib:"Feux de répétiteur clignotant gauche", code:"rep_clignotant_ga"},
+    {lib:"Feux orangés latéraux",          code:"latéraux"},
+    {lib:"Feux d’encombrement",            code:"encombrement"},
+    {lib:"Feux stop",                      code:"stop"},
+    {lib:"Feux de brouillard avant",       code:"brouillard_av"},
+    {lib:"Feux de brouillard arrière",     code:"brouillard_ar"},
+    {lib:"Feux de recul",                  code:"recul"},
+    {lib:"Feux rouges",                    code:"rouges"},
+    {lib:"Feux de gabarit",                code:"gabarit"}
+  ];
+
+  /* 2) Filtres par type */
+  var removeCodes = new Set();
+  if(t === "voiture"){
+    // enlève : gabarit, encombrement, répétiteur, latéraux, caisse, cabine
+    ["gabarit","encombrement","rep_clignotant_dr","rep_clignotant_ga","latéraux","caisse","cabine"]
+      .forEach(c=>removeCodes.add(c));
+  }else if(t === "tracteur"){
+    // enlève : encombrement, caisse, gabarit
+    ["encombrement","caisse","gabarit"].forEach(c=>removeCodes.add(c));
+  }else if(isTrailer){
+    // remorque / semi : enlève : position, croisement, route, cabine, brouillard_av, répéteurs dr/ga
+    ["position","croisement","route","cabine","brouillard_av","rep_clignotant_dr","rep_clignotant_ga"]
+      .forEach(c=>removeCodes.add(c));
+  } // porteur : on garde tout
+
+  var LISTE = BASE.filter(f=>!removeCodes.has(f.code));
+
+  /* 3) Champs complémentaires et règles d’affichage */
+  // Feux qui demandent CÔTÉ (G/D/Les deux) *uniquement si anomalie*
+  // (inclut maintenant caisse et cabine)
+  var NEED_SIDE_GD = new Set([
+    "encombrement","stop","brouillard_av","brouillard_ar",
+    "position","croisement","route","recul","rouges","gabarit",
+    "caisse","cabine"
+  ]);
+
+  // Clignotants : si anomalie et pas remorque/semi -> demander AV/AR/Les deux
+  function isCligno(code){ return code==="clignotant_dr" || code==="clignotant_ga"; }
+
+  /* 4) Init/merge state.feux selon la LISTE */
+  if(!state.feux) state.feux = [];
+  var existingByCode = Object.fromEntries(state.feux.map(x=>[x.code,x]));
+  var next = [];
+  LISTE.forEach(f=>{
+    if(existingByCode[f.code]){
+      next.push(Object.assign({lib:f.lib, code:f.code, fonction:"", etat:"", proprete:"", cote:"", avar:""}, existingByCode[f.code]));
+    }else{
+      next.push({lib:f.lib, code:f.code, fonction:"", etat:"", proprete:"", cote:"", avar:""});
+    }
+  });
+  state.feux = next;
+
+  /* 5) Rendu */
+  elContent.innerHTML = '<div class="card"><h3>5) Feux</h3>'+ state.feux.map(feuRow).join("") +'</div>';
+
+  /* 6) Bind */
+  elContent.onchange = function(e){
+    var i = e.target.getAttribute("data-i");
+    if(i==null) return;
+    var F = state.feux[i];
+    if(e.target.classList.contains("fonction")) F.fonction = e.target.value;
+    if(e.target.classList.contains("etat"))     F.etat     = e.target.value;
+    if(e.target.classList.contains("proprete")) F.proprete = e.target.value;
+    if(e.target.classList.contains("cote"))     F.cote     = e.target.value; // Gauche/Droite/Les deux
+    if(e.target.classList.contains("avar"))     F.avar     = e.target.value; // Avant/Arrière/Les deux (clignos hors remorque/semi)
+    syncFeuRow(+i);
+  };
+
+  for(var i=0;i<state.feux.length;i++) syncFeuRow(i);
+
+  /* --- helpers --- */
+  function feuRow(f,i){
+    var selFonct =
+      '<select class="fonction require-choice" data-i="'+i+'">'+
+        '<option value="">—</option>'+
+        '<option'+(f.fonction==="Fonctionne"?' selected':'')+'>Fonctionne</option>'+
+        '<option'+(f.fonction==="Anomalie"?' selected':'')+'>Anomalie</option>'+
+      '</select>';
+
+    var selEtat =
+      '<select class="etat require-choice" data-i="'+i+'">'+
+        '<option value="">—</option>'+
+        '<option'+(f.etat==="Bon état"?' selected':'')+'>Bon état</option>'+
+        '<option'+(f.etat==="Mauvais état"?' selected':'')+'>Mauvais état</option>'+
+      '</select>';
+
+    var selProp =
+      '<select class="proprete require-choice" data-i="'+i+'">'+
+        OPT_PROP_FULL.replace(">"+f.proprete+"<"," selected>"+f.proprete+"<")+
+      '</select>';
+
+    var selCote =
+      '<label class="inline cote-wrap hide"><span>Côté</span>'+
+        '<select class="cote" data-i="'+i+'">'+
+          '<option value="">—</option>'+
+          '<option'+(f.cote==="Gauche"?' selected':'')+'>Gauche</option>'+
+          '<option'+(f.cote==="Droite"?' selected':'')+'>Droite</option>'+
+          '<option'+(f.cote==="Les deux"?' selected':'')+'>Les deux</option>'+
+        '</select>'+
+      '</label>';
+
+    var selAvar =
+      '<label class="inline avar-wrap hide"><span>Position</span>'+
+        '<select class="avar" data-i="'+i+'">'+
+          '<option value="">—</option>'+
+          '<option'+(f.avar==="Avant"?' selected':'')+'>Avant</option>'+
+          '<option'+(f.avar==="Arrière"?' selected':'')+'>Arrière</option>'+
+          '<option'+(f.avar==="Les deux"?' selected':'')+'>Les deux</option>'+
+        '</select>'+
+      '</label>';
+
+    return ''+
+      '<div class="line" id="feu-'+i+'">'+
+        '<span class="label-fixed"><strong>'+esc(f.lib)+'</strong></span>'+
+        '<label class="inline"><span>Fonction.</span>'+selFonct+'</label>'+
+        '<label class="inline"><span>État</span>'+selEtat+'</label>'+
+        '<label class="inline"><span>Propreté</span>'+selProp+'</label>'+
+        selCote+
+        selAvar+
+      '</div>';
+  }
+
+  function syncFeuRow(i){
+    var F = state.feux[i];
+    var row = $("#feu-"+i);
+    if(!row) return;
+    var anomaly = (F.fonction==="Anomalie" || F.etat==="Mauvais état");
+
+    var coteWrap = row.querySelector(".cote-wrap");
+    var needGD = NEED_SIDE_GD.has(F.code);
+    if(coteWrap) coteWrap.classList.toggle("hide", !(anomaly && needGD));
+
+    var avarWrap = row.querySelector(".avar-wrap");
+    var needAvar = (!isTrailer && isCligno(F.code)); // seulement non-remorque/semi
+    if(avarWrap) avarWrap.classList.toggle("hide", !(anomaly && needAvar));
+  }
+}
+/* ====================== VITRAGES (+ essuie-glace) ====================== */
+function renderVitrages(){
+  var t=state.setup.type, trailer=(t==="remorque"||t==="semi");
+  if(trailer){ elContent.innerHTML='<div class="card"><h3>6) Vitrages</h3><p class="hint">Non applicable.</p></div>'; return; }
+  if(!state.vitrages){
+    state.vitrages={
+      pareBrise:{etat:"",proprete:"",impact:0},
+      coteG:{etat:"",proprete:"",impact:0},
+      coteD:{etat:"",proprete:"",impact:0},
+      vitreArriere:(t==="voiture")?{etat:"",proprete:"",impact:0}:null,
+      essuieGlace:{etat:"", cote:""} // NOUVEAU
+    };
+  }
+  var L={pareBrise:"Pare-brise",coteG:"Côté gauche",coteD:"Côté droit",vitreArriere:"Vitre arrière"};
+
+  function rowVit(k,v){
+    return '<div class="line" data-vk="'+k+'"><span class="label-fixed"><strong>'+L[k]+'</strong></span>'+
+      '<label class="inline"><span>État</span><select class="vit-etat require-choice">'+OPT_ETAT_BM.replace(">"+v.etat+"<"," selected>"+v.etat+"<")+'</select></label>'+
+      '<label class="inline"><span>Propreté</span><select class="vit-prop require-choice">'+OPT_PROP_FULL.replace(">"+v.proprete+"<"," selected>"+v.proprete+"<")+'</select></label>'+
+      '<label class="inline"><span>Impact(s)</span><input class="vit-imp require-choice" type="number" min="0" value="'+esc(v.impact||0)+'"></label></div>';
+  }
+
+  // Essuie-glace : propre bloc
+  function rowEssuie(){
+    var v=state.vitrages.essuieGlace;
+    return '<div class="line" data-essg="1"><span class="label-fixed"><strong>Essuie-glace</strong></span>'+
+      '<label class="inline"><span>État</span><select class="eg-etat require-choice">'+
+        '<option value="">— Faites votre choix —</option>'+
+        '<option'+(v.etat==="Bon"?' selected':'')+'>Bon</option>'+
+        '<option'+(v.etat==="Mauvais"?' selected':'')+'>Mauvais</option>'+
+      '</select></label>'+
+      '<label class="inline eg-cote-wrap '+(v.etat==="Mauvais"?'':'hide')+'"><span>Côté</span><select class="eg-cote">'+
+        '<option value="">—</option>'+
+        '<option'+(v.cote==="Gauche"?' selected':'')+'>Gauche</option>'+
+        '<option'+(v.cote==="Droite"?' selected':'')+'>Droite</option>'+
+        '<option'+(v.cote==="Les deux"?' selected':'')+'>Les deux</option>'+
+      '</select></label></div>';
+  }
+
+  elContent.innerHTML='<div class="card"><h3>6) Vitrages</h3>'+
+    Object.keys(state.vitrages).map(function(k){
+      var v=state.vitrages[k]; if(!v || k==="essuieGlace") return "";
+      return rowVit(k,v);
+    }).join("")+
+    rowEssuie()+
+  '</div>';
+
+  elContent.onchange=function(e){
+    var row=e.target.closest("[data-vk]");
+    if(row){
+      var k=row.getAttribute("data-vk"), v=state.vitrages[k];
+      if(e.target.classList.contains("vit-etat")) v.etat=e.target.value;
+      if(e.target.classList.contains("vit-prop")) v.proprete=e.target.value;
+      if(e.target.classList.contains("vit-imp"))  v.impact=+e.target.value||0;
+      return;
+    }
+    var eg = e.target.closest("[data-essg]");
+    if(eg){
+      var g=state.vitrages.essuieGlace;
+      if(e.target.classList.contains("eg-etat")){
+        g.etat=e.target.value;
+        eg.querySelector(".eg-cote-wrap").classList.toggle("hide", g.etat!=="Mauvais");
+      }
+      if(e.target.classList.contains("eg-cote")) g.cote=e.target.value;
+    }
+  };
+}
+
+/* ====================== RÉTROS ====================== */
+function renderRetros(){
+  var t=state.setup.type, trailer=(t==="remorque"||t==="semi"); if(trailer){elContent.innerHTML='<div class="card"><h3>7) Rétroviseurs</h3><p class="hint">Non applicable.</p></div>';return;}
+  var isCar=(t==="voiture");
+  if(!state.retros){
+    state.retros = isCar
+      ? {gauche:{etat:"",proprete:"",fixation:""},droite:{etat:"",proprete:"",fixation:""}}
+      : {gauche:{etat:"",proprete:"",fixation:""},droite:{etat:"",proprete:"",fixation:""},
+         grandAngleG:{etat:"",proprete:"",fixation:""},grandAngleD:{etat:"",proprete:"",fixation:""},
+         accotement:{etat:"",proprete:"",fixation:""},anteviseur:{present:false,etat:"",proprete:"",fixation:""}};
+  }
+  var L=isCar?{gauche:"Rétro gauche",droite:"Rétro droit"}:{gauche:"Rétro gauche",droite:"Rétro droit",grandAngleG:"Grand angle G",grandAngleD:"Grand angle D",accotement:"Rétro d’accotement",anteviseur:"Antéviseur"};
+  elContent.innerHTML='<div class="card"><h3>7) Rétroviseurs</h3>'+
+    Object.keys(L).map(function(k){var r=state.retros[k], lib=L[k];
+      if(r && r.hasOwnProperty("present")){
+        var dis=r.present?'':' disabled';
+        return '<div class="line" data-rk="'+k+'"><span class="label-fixed"><strong>'+lib+'</strong></span>'+
+          '<label class="inline"><span>Présence</span><input type="checkbox" class="ret-pres"'+(r.present?' checked':'')+'></label>'+
+          '<label class="inline"><span>État</span><select class="ret-etat require-choice"'+dis+'>'+OPT_ETAT_BM.replace(">"+r.etat+"<"," selected>"+r.etat+"<")+'</select></label>'+
+          '<label class="inline"><span>Propreté</span><select class="ret-prop require-choice"'+dis+'>'+OPT_PROP_FULL.replace(">"+r.proprete+"<"," selected>"+r.proprete+"<")+'</select></label>'+
+          '<label class="inline"><span>Fixation</span><select class="ret-fix require-choice"'+dis+'>'+OPT_ETAT_BM.replace(">"+r.fixation+"<"," selected>"+r.fixation+"<")+'</select></label></div>';
+      }
+      return '<div class="line" data-rk="'+k+'"><span class="label-fixed"><strong>'+lib+'</strong></span>'+
+        '<label class="inline"><span>État</span><select class="ret-etat require-choice">'+OPT_ETAT_BM.replace(">"+r.etat+"<"," selected>"+r.etat+"<")+'</select></label>'+
+        '<label class="inline"><span>Propreté</span><select class="ret-prop require-choice">'+OPT_PROP_FULL.replace(">"+r.proprete+"<"," selected>"+r.proprete+"<")+'</select></label>'+
+        '<label class="inline"><span>Fixation</span><select class="ret-fix require-choice">'+OPT_ETAT_BM.replace(">"+r.fixation+"<"," selected>"+r.fixation+"<")+'</select></label></div>';
+    }).join("")+'</div>';
+  elContent.onchange=function(e){
+    var rr=e.target.closest("[data-rk]"); if(!rr) return; var k=rr.getAttribute("data-rk"), r=state.retros[k];
+    if(e.target.classList.contains("ret-pres")){
+      r.present=e.target.checked; rr.querySelectorAll(".ret-etat,.ret-prop,.ret-fix").forEach(sel=>sel.disabled=!r.present); return;
+    }
+    if(e.target.classList.contains("ret-etat")) r.etat=e.target.value;
+    if(e.target.classList.contains("ret-prop")) r.proprete=e.target.value;
+    if(e.target.classList.contains("ret-fix")) r.fixation=e.target.value;
+  };
+}
+</script>
+<script>
+/* =================== NIVEAUX (jauges 10cm + une ligne par item) =================== */
+function renderNiveaux(){
+  var t=state.setup.type, trailer=(t==="remorque"||t==="semi"); 
+  if(trailer){ elContent.innerHTML='<div class="card"><h3>8) Niveaux</h3><p class="hint">Non applicable.</p></div>'; return; }
+  var isCar=(t==="voiture"), isRobot=(state.setup.boite==="Robotisée");
+  if(!state.niveaux){
+    state.niveaux={
+      carburantType:"", carburantPct:50,
+      adbluePresent:"", adbluePct:50,
+      refroidissement:"", laveGlace:"", huile:"",
+      frein: isCar ? "" : null,
+      direction: (!isCar) ? "" : null,        // “liquide d’assistance de direction”
+      embrayage: (!isCar && !isRobot) ? "" : null // “liquide d’assistance d’embrayage”
+    };
+  }
+  if(isRobot) state.niveaux.embrayage=null;
+  var N=state.niveaux;
+
+  function colorFor(v){
+    if(v<=20) return "#e10600";
+    if(v<=40) return "#ff8c00";
+    if(v<=70) return "#ffd400";
+    return "#00a35a";
+  }
+
+  elContent.innerHTML =
+  '<div class="card"><h3>8) Niveaux</h3>'+
+    /* Carburant : ligne dédiée avec classe .niv (évite chevauchements) */
+    '<div class="line niv"><span class="label-fixed"><strong>Carburant</strong></span>'+
+      '<label class="inline" style="min-width:200px"><span>Type</span><select id="niv-type" class="require-choice">'+
+        '<option value="">—</option><option'+(N.carburantType==="GO"?' selected':'')+'>GO</option><option'+(N.carburantType==="Essence"?' selected':'')+'>Essence</option></select></label>'+
+      '<div class="gauge-wrap"><span>Jauge</span>'+
+        '<div id="g-carb" class="gauge"><div class="bar" style="width:'+N.carburantPct+'%;background:'+colorFor(N.carburantPct)+'"></div></div>'+
+        '<span id="g-carb-val" class="pill">'+N.carburantPct+' %</span></div>'+
+    '</div>'+
+
+    /* AdBlue */
+    '<div class="line niv"><span class="label-fixed"><strong>AdBlue</strong></span>'+
+      '<label class="inline" style="min-width:200px"><span>Présence</span><select id="niv-adb" class="require-choice">'+
+        '<option value="">—</option><option'+(N.adbluePresent==="Oui"?' selected':'')+'>Oui</option><option'+(N.adbluePresent==="Non"?' selected':'')+'>Non</option></select></label>'+
+      '<div id="adb-zone" class="gauge-wrap" style="'+(N.adbluePresent==="Oui"?'':'display:none')+'"><span>Jauge</span>'+
+        '<div id="g-adb" class="gauge"><div class="bar" style="width:'+N.adbluePct+'%;background:'+colorFor(N.adbluePct)+'"></div></div>'+
+        '<span id="g-adb-val" class="pill">'+N.adbluePct+' %</span></div>'+
+    '</div>'+
+
+    /* Chaque liquide sur sa propre ligne (plus lisible) */
+    '<div class="line"><span class="label-fixed"><strong>Refroidissement</strong></span>'+
+      '<label class="inline"><span>Niveau</span><select id="niv-ref" class="require-choice">'+OPT_ETAT_BM.replace(">"+N.refroidissement+"<"," selected>"+N.refroidissement+"<")+'</select></label>'+
+    '</div>'+
+    '<div class="line"><span class="label-fixed"><strong>Lave-glace</strong></span>'+
+      '<label class="inline"><span>Niveau</span><select id="niv-lav" class="require-choice">'+OPT_ETAT_BM.replace(">"+N.laveGlace+"<"," selected>"+N.laveGlace+"<")+'</select></label>'+
+    '</div>'+
+    '<div class="line"><span class="label-fixed"><strong>Huile</strong></span>'+
+      '<label class="inline"><span>Niveau</span><select id="niv-hui" class="require-choice">'+OPT_ETAT_BM.replace(">"+N.huile+"<"," selected>"+N.huile+"<")+'</select></label>'+
+    '</div>'+
+    (N.direction!==null? '<div class="line"><span class="label-fixed"><strong>Liquide d’assistance de direction</strong></span><label class="inline"><span>Niveau</span><select id="niv-dir" class="require-choice">'+OPT_ETAT_BM.replace(">"+N.direction+"<"," selected>"+N.direction+"<")+'</select></label></div>' : '')+
+    (N.embrayage!==null? '<div class="line"><span class="label-fixed"><strong>Liquide d’assistance d’embrayage</strong></span><label class="inline"><span>Niveau</span><select id="niv-emb" class="require-choice">'+OPT_ETAT_BM.replace(">"+N.embrayage+"<"," selected>"+N.embrayage+"<")+'</select></label></div>' : '')+
+    (N.frein!==null? '<div class="line"><span class="label-fixed"><strong>Frein</strong></span><label class="inline"><span>Niveau</span><select id="niv-fre" class="require-choice">'+OPT_ETAT_BM.replace(">"+N.frein+"<"," selected>"+N.frein+"<")+'</select></label></div>' : '')+
+  '</div>';
+
+  function bindGauge(id, lab, get, set){
+    var g=$(id), bar=g.querySelector(".bar"), l=$(lab);
+    g.onclick=function(e){
+      var r=g.getBoundingClientRect();
+      var v=Math.max(0, Math.min(100, Math.round((e.clientX-r.left)/r.width*100)));
+      set(v);
+      bar.style.width=v+"%";
+      bar.style.background = (v<=20)?"#e10600":(v<=40)?"#ff8c00":(v<=70)?"#ffd400":"#00a35a";
+      l.textContent=v+" %";
+    };
+  }
+  bindGauge("#g-carb","#g-carb-val", ()=>N.carburantPct, v=>N.carburantPct=v);
+  if(N.adbluePresent==="Oui") bindGauge("#g-adb","#g-adb-val", ()=>N.adbluePct, v=>N.adbluePct=v);
+
+  $("#niv-type").onchange=e=>N.carburantType=e.target.value;
+  $("#niv-adb").onchange=e=>{
+    N.adbluePresent=e.target.value;
+    $("#adb-zone").style.display=(N.adbluePresent==="Oui")?"flex":"none";
+    if(N.adbluePresent==="Oui") bindGauge("#g-adb","#g-adb-val", ()=>N.adbluePct, v=>N.adbluePct=v);
+  };
+  [["#niv-ref","refroidissement"],["#niv-lav","laveGlace"],["#niv-hui","huile"],
+   ["#niv-fre","frein"],["#niv-dir","direction"],["#niv-emb","embrayage"]]
+   .forEach(function(p){var el=$(p[0]); if(el) el.onchange=function(ev){ N[p[1]]=ev.target.value; }});
+}
+/* =================== PORTES (Portes / Ridelle + côté AR) =================== */
+function renderPortes(){
+  var t=state.setup.type, isTrailer=(t==="remorque"||t==="semi");
+  var defs=[]; 
+  if(t==="voiture") defs=["AVG","AVD","ARG","ARD","Coffre"];
+  else if(t==="tracteur") defs=["AVG","AVD"];
+  else if(t==="porteur") defs=["AVG","AVD","Arrière"];
+  else if(isTrailer) defs=["Arrière"];
+
+  if(!state.portes || !state.portes.length){
+    state.portes = defs.map(function(lib){
+      return {lib:lib, type:(/Arrière/.test(lib)&&(t!=="voiture"))?"Portes":"Portes",
+              fermeture:"", etancheite:"", cote:"",
+              ridelle:{coulisse:"", ferme:""}};
+    });
+  }
+
+  function row(p,i){
+    var isRear = /Arrière/.test(p.lib) && (t!=="voiture");
+    return '<div class="line" data-i="'+i+'"><span class="label-fixed"><strong>'+p.lib+'</strong></span>'+
+      (isRear
+        ? '<label class="inline"><span>Type</span><select class="pr-type"><option'+(p.type==="Portes"?' selected':'')+'>Portes</option><option'+(p.type==="Ridelle"?' selected':'')+'>Ridelle</option></select></label>'+
+          (p.type==="Ridelle"
+            ? '<label class="inline"><span>Coulisse</span><select class="rid-c">'+OPT_ETAT_BM.replace(">"+p.ridelle.coulisse+"<"," selected>"+p.ridelle.coulisse+"<")+'</select></label>'+
+              '<label class="inline"><span>Fermeture</span><select class="rid-f">'+OPT_ETAT_BM.replace(">"+p.ridelle.ferme+"<"," selected>"+p.ridelle.ferme+"<")+'</select></label>'
+            : '<label class="inline"><span>Fermeture</span><select class="pf">'+OPT_ETAT_BM.replace(">"+p.fermeture+"<"," selected>"+p.fermeture+"<")+'</select></label>'+
+              '<label class="inline"><span>Étanchéité</span><select class="pt">'+OPT_ETAT_BM.replace(">"+p.etancheite+"<"," selected>"+p.etancheite+"<")+'</select></label>'+
+              '<label class="inline cote-wrap '+((p.fermeture==="Mauvais"||p.etancheite==="Mauvais")?'':'hide')+'"><span>Côté</span><select class="pc"><option value="">—</option><option'+(p.cote==="Gauche"?' selected':'')+'>Gauche</option><option'+(p.cote==="Droite"?' selected':'')+'>Droite</option></select></label>'
+          )
+        : '<label class="inline"><span>Fermeture</span><select class="pf">'+OPT_ETAT_BM.replace(">"+p.fermeture+"<"," selected>"+p.fermeture+"<")+'</select></label>'+
+          '<label class="inline"><span>Étanchéité</span><select class="pt">'+OPT_ETAT_BM.replace(">"+p.etancheite+"<"," selected>"+p.etancheite+"<")+'</select></label>'
+      )+'</div>';
+  }
+
+  elContent.innerHTML = '<div class="card"><h3>9) Portes</h3>'+ state.portes.map(row).join("") +'</div>';
+
+  elContent.onchange=function(e){
+    var r=e.target.closest("[data-i]"); if(!r) return; var P=state.portes[+r.dataset.i];
+    if(e.target.classList.contains("pr-type")){ P.type=e.target.value; renderPortes(); return; }
+    if(e.target.classList.contains("pf")) P.fermeture=e.target.value;
+    if(e.target.classList.contains("pt")) P.etancheite=e.target.value;
+    if(e.target.classList.contains("pc")) P.cote=e.target.value;
+    if(e.target.classList.contains("rid-c")) P.ridelle.coulisse=e.target.value;
+    if(e.target.classList.contains("rid-f")) P.ridelle.ferme=e.target.value;
+
+    var cw=r.querySelector(".cote-wrap");
+    if(cw) cw.classList.toggle("hide", !(P.fermeture==="Mauvais"||P.etancheite==="Mauvais"));
+  };
+}
+
+/* =================== CHARGEMENT (présence + 2 lignes + libellés + état intérieur) =================== */
+function renderChargement(){
+  var t=state.setup.type, applicable=(t==="porteur"||t==="remorque"||t==="semi");
+  if(!applicable){ elContent.innerHTML='<div class="card"><h3>10) Chargement</h3><p class="hint">Non applicable.</p></div>'; return; }
+
+  if(!state.chg){
+    state.chg={
+      present:false,
+      lignes:[{qty:"", nature:"", poids:"", arrimage:"", repartition:"", calage:""}],
+      interieur:{paroiG:"", paroiD:"", tablier:"", toit:"", plancher:"", etanche:""}
+    };
+  } else {
+    state.chg.present=!!state.chg.present;
+    state.chg.interieur = state.chg.interieur || {paroiG:"", paroiD:"", tablier:"", toit:"", plancher:"", etanche:""};
+  }
+
+  function total(){ return state.chg.lignes.reduce((s,l)=>s+(+l.qty||0)*(+l.poids||0),0); }
+  function ynLabel(current,label){
+    return '<option value="" disabled '+(current===""?'selected':'')+'>'+label+'</option>'+
+           '<option'+(current==="Oui"?' selected':'')+'>Oui</option>'+
+           '<option'+(current==="Non"?' selected':'')+'>Non</option>';
+  }
+  function row(l,i){
+    return `
+      <div class="load-row" data-i="${i}">
+        <div class="top">
+          <input type="number" class="chg-qty require-choice" placeholder="Nombre" value="${esc(l.qty)}">
+          <input type="text"   class="chg-nature require-choice" placeholder="Nature (ex : palettes)" value="${esc(l.nature)}">
+          <input type="number" class="chg-poids require-choice" placeholder="Poids unitaire (kg)" value="${esc(l.poids)}">
+        </div>
+        <div class="bottom">
+          <select class="chg-arr require-choice">${ynLabel(l.arrimage,"Arrimage")}</select>
+          <select class="chg-rep require-choice">${ynLabel(l.repartition,"Répartition")}</select>
+          <select class="chg-cal require-choice">${ynLabel(l.calage,"Calage")}</select>
+          <span class="cross-del" title="Supprimer">✖</span>
+        </div>
+      </div>`;
+  }
+
+  function draw(){
+    var I=state.chg.interieur||{};
+    elContent.innerHTML =
+      '<div class="card"><h3>10) Chargement</h3>'+
+        '<div class="row" style="margin-bottom:8px"><label class="inline" style="gap:10px"><input type="checkbox" id="chg-pres" '+(state.chg.present?'checked':'')+'> <span class="pill">Chargement présent</span></label></div>'+
+        '<div id="chg-zone" class="'+(state.chg.present?'':'hide')+'">'+
+          state.chg.lignes.map(row).join("")+
+          '<div class="row" style="justify-content:space-between;margin-top:8px">'+
+            '<button class="btn" id="chg-add">+ Ajouter une ligne</button>'+
+            '<span class="pill">Total : <strong id="chg-total">'+total().toFixed(1)+'</strong> kg</span>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="card" style="margin-top:10px"><h3>État intérieur du véhicule</h3>'+
+        '<div class="line"><span class="label-fixed"><strong>Paroi gauche</strong></span>'+
+          '<label class="inline"><span>État</span><select id="int-pg" class="require-choice">'+OPT_ETAT_BM.replace(">"+I.paroiG+"<"," selected>"+I.paroiG+"<")+'</select></label>'+
+        '</div>'+
+        '<div class="line"><span class="label-fixed"><strong>Paroi droite</strong></span>'+
+          '<label class="inline"><span>État</span><select id="int-pd" class="require-choice">'+OPT_ETAT_BM.replace(">"+I.paroiD+"<"," selected>"+I.paroiD+"<")+'</select></label>'+
+        '</div>'+
+        '<div class="line"><span class="label-fixed"><strong>Tablier</strong></span>'+
+          '<label class="inline"><span>État</span><select id="int-tab" class="require-choice">'+OPT_ETAT_BM.replace(">"+I.tablier+"<"," selected>"+I.tablier+"<")+'</select></label>'+
+        '</div>'+
+        '<div class="line"><span class="label-fixed"><strong>Toit</strong></span>'+
+          '<label class="inline"><span>État</span><select id="int-toit" class="require-choice">'+OPT_ETAT_BM.replace(">"+I.toit+"<"," selected>"+I.toit+"<")+'</select></label>'+
+        '</div>'+
+        '<div class="line"><span class="label-fixed"><strong>Plancher</strong></span>'+
+          '<label class="inline"><span>État</span><select id="int-planch" class="require-choice">'+OPT_ETAT_BM.replace(">"+I.plancher+"<"," selected>"+I.plancher+"<")+'</select></label>'+
+        '</div>'+
+'<div class="line niv"><span class="label-fixed"><strong>Étanchéité globale</strong></span>'+
+  '<label class="inline"><span>Statut</span><input id="int-etanche" class="require-choice" value="'+(I.etanche||"")+'" readonly style="height:var(--ctl-h);padding:0 .75rem;border:1px solid var(--line);border-radius:8px;background:#fafafa"></label>'+
+  '<div></div>'+
+'</div>'+
+'<p class="hint" style="margin:4px 0 0 calc(var(--label-w) + 6px);">Calcul automatique&nbsp;: “Oui” uniquement si tous les éléments sont en “Bon”.</p>'+
+      '</div>';
+  }
+
+  function recomputeEtanche(){
+    var I=state.chg.interieur;
+    var all = [I.paroiG,I.paroiD,I.tablier,I.toit,I.plancher];
+    var ok = all.every(x=>x && x==="Bon");
+    I.etanche = ok ? "Oui" : "Non";
+    var inp=$("#int-etanche"); if(inp) inp.value=I.etanche;
+  }
+
+  draw();
+
+  elContent.onclick=function(e){
+    if(e.target.id==="chg-add"){
+      state.chg.lignes.push({qty:"", nature:"", poids:"", arrimage:"", repartition:"", calage:""}); draw();
+    }
+    if(e.target.classList.contains("cross-del")){
+      var i=+e.target.closest("[data-i]").dataset.i;
+      state.chg.lignes.splice(i,1); draw();
+    }
+  };
+  elContent.oninput=function(e){
+    if(e.target.id==="chg-pres"){
+      state.chg.present = e.target.checked;
+      $("#chg-zone").classList.toggle("hide", !state.chg.present);
+      return;
+    }
+    var r=e.target.closest("[data-i]"); if(r){
+      var L=state.chg.lignes[+r.dataset.i];
+      if(e.target.classList.contains("chg-qty"))    L.qty=e.target.value;
+      if(e.target.classList.contains("chg-nature")) L.nature=e.target.value;
+      if(e.target.classList.contains("chg-poids"))  L.poids=e.target.value;
+      var tot=$("#chg-total"); if(tot) tot.textContent=total().toFixed(1);
+      return;
+    }
+  };
+  elContent.onchange=function(e){
+    var r=e.target.closest("[data-i]");
+    if(r){
+      var L=state.chg.lignes[+r.dataset.i];
+      if(e.target.classList.contains("chg-arr")) L.arrimage=e.target.value;
+      if(e.target.classList.contains("chg-rep")) L.repartition=e.target.value;
+      if(e.target.classList.contains("chg-cal")) L.calage=e.target.value;
+      return;
+    }
+    var I=state.chg.interieur;
+    if(e.target.id==="int-pg") I.paroiG=e.target.value;
+    if(e.target.id==="int-pd") I.paroiD=e.target.value;
+    if(e.target.id==="int-tab") I.tablier=e.target.value;
+    if(e.target.id==="int-toit") I.toit=e.target.value;
+    if(e.target.id==="int-planch") I.plancher=e.target.value;
+    recomputeEtanche();
+  };
+}
+
+/* =================== RÉCAP (messages pros) =================== */
+function recapSection(title,items){
+  return '<h3>'+title+'</h3>'+(items.length?('<ul>'+items.map(t=>'<li>'+t+'</li>').join("")+'</ul>'):'<p class="hint">Pas d’anomalie ni de défaut constaté.</p>');
+}
+function anomaliesDocs(){
+  var out=[],D=state.docs||{},today=todayISO();
+  function span(txt,color){ return '<span style="color:'+color+'">'+esc(txt)+'</span>'; }
+  function miss(name,p){ if(p!=="Oui") out.push(span(name+' — absent','#e10600')); }
+
+  // Certificat d'immatriculation + CT A/S/R + date
+  if(D.ci){
+    miss('Certificat immatriculation',D.ci.present);
+    if(D.ci.present==="Oui"){
+      var lettre = D.ci.ctLettre||"";
+      var date   = D.ci.ctDate||"";
+      var col = "#1a7f37"; // vert par défaut pour A
+      if(lettre==="S") col="#ff8c00";
+      if(lettre==="R") col="#e10600";
+      // si date dépassée -> rouge quelle que soit la lettre
+      if(date && date<today) col="#e10600";
+      if(!lettre) out.push(span("CT — lettre manquante","#ff8c00"));
+      if(!date)   out.push(span("CT — date manquante","#ff8c00"));
+      if(lettre||date) out.push(span('CT : '+(lettre||'—')+' — validité '+(date||'—'), col));
+    }
+  }
+
+  // Assurance : date périmée -> rouge
+  if(D.assur){
+    miss('Certificat assurance',D.assur.present);
+    if(D.assur.present==="Oui"){
+      if(D.assur.date && D.assur.date<today) out.push(span('Assurance — date périmée ('+D.assur.date+')','#e10600'));
+    }
+  }
+
+  if(D.constat && D.constat.present!=="Oui") out.push(span('Constat amiable — absent','#e10600'));
+  if(D.carte   && D.carte.present!=="Oui")   out.push(span('Carte routière / GPS — absent','#ff8c00'));
+  if(D.ethylo  && D.ethylo.present!=="Oui")  out.push(span('Éthylotest — absent','#ff8c00'));
+  if(D.gilet   && D.gilet.present!=="Oui")   out.push(span('Gilet haute visibilité — absent','#ff8c00'));
+  if(D.manuel  && D.manuel.present!=="Oui")  out.push(span('Manuel d’utilisation — absent','#ff8c00'));
+
+  // Taxe à l’essieu (PL) : absence ou tampon manquant -> rouge
+  if(D.taxe){
+    if(D.taxe.present!=="Oui") out.push(span('Taxe à l’essieu — absente','#e10600'));
+    else if(D.taxe.tampon!=="Oui") out.push(span('Taxe à l’essieu — tampon douane absent','#e10600'));
+  }
+
+  // Extincteur : absence rouge ; goupille enlevée -> rouge
+  if(D.extincteur){
+    if(D.extincteur.present!=="Oui") out.push(span('Extincteur — absent','#e10600'));
+    else if(D.extincteur.goupille!=="Oui") out.push(span('Extincteur — goupille absente','#e10600'));
+  }
+
+  return out;
+}
+function anomaliesPneus(){
+  var out=[],lib={AV_G:"Avant G",AV_D:"Avant D",CENTRE_G:"Centre G",CENTRE_D:"Centre D",AR_G:"Arrière G",AR_D:"Arrière D"};
+  Object.keys(state.pneus||{}).forEach(function(p){
+    var d=state.pneus[p]||{}, a=[];
+    if(d.pression && d.pression!=="Bonne") a.push("pression incorrecte");
+    if(d.hernie==="Oui") a.push("hernie");
+    if(d.dechirure==="Oui") a.push("déchirure");
+    if(d.corpsBande==="Oui") a.push("corps étranger (bande)");
+    if(d.entreJum==="Oui") a.push("corps entre jumelés");
+    if(a.length){
+      var base = lib[p]+' — '+(d.dimension?d.dimension+' — ':'')+a.join(', ');
+      out.push(base+' — intervention à programmer');
+    }
+  });
+  return out;
+}
+function anomaliesFeux(){
+  var out=[];
+  (state.feux||[]).forEach(function(f){
+    if(f.code==="brouillard_av" && f.presence===false) return; // non présent => pas d’interaction
+    var a=[];
+    if(f.fonction==="Anomalie") a.push("anomalie de fonctionnement");
+    if(f.etat==="Mauvais état") a.push("mauvais état");
+    if(f.proprete && f.proprete!=="Propre") a.push("nécessité de nettoyage/entretien");
+    if(a.length){
+      var side = f.fixedSide ? "" : (f.cote? ' (côté '+f.cote+')' : '');
+      out.push((f.lib||f.code)+' — '+a.join(', ')+side);
+    }
+  });
+  return out;
+}
+function anomaliesVitrages(){
+  var out=[], L={pareBrise:"Pare-brise",coteG:"Côté gauche",coteD:"Côté droit",vitreArriere:"Vitre arrière"};
+  Object.keys(state.vitrages||{}).forEach(function(k){
+    var v=state.vitrages[k]; if(!v) return;
+    var a=[]; if(v.etat==="Mauvais") a.push("état mauvais");
+    if(v.impact>0) a.push(v.impact+" impact(s)");
+    if(v.proprete && v.proprete!=="Propre") a.push("nécessité de nettoyage/entretien");
+    if(a.length) out.push(L[k]+' — '+a.join(', '));
+  });
+  return out;
+}
+function anomaliesRetros(){
+  var out=[], lab={gauche:"Rétro gauche",droite:"Rétro droit",grandAngleG:"Grand angle G",grandAngleD:"Grand angle D",accotement:"Rétro d’accotement",anteviseur:"Antéviseur"};
+  Object.keys(state.retros||{}).forEach(function(k){
+    var r=state.retros[k]; if(!r) return; if(r.hasOwnProperty("present") && !r.present) return;
+    var a=[]; if(r.etat==="Mauvais") a.push("état mauvais"); if(r.fixation==="Mauvais") a.push("fixation mauvaise");
+    if(r.proprete && r.proprete!=="Propre") a.push("nécessité de nettoyage/entretien");
+    if(a.length) out.push((lab[k]||k)+' — '+a.join(', '));
+  });
+  return out;
+}
+function anomaliesNiveaux(){
+  var N=state.niveaux||{}, out=[];
+  function appoint(x){ out.push('Faire l’appoint en liquide de '+x); }
+  if(N.refroidissement==="Mauvais") appoint('refroidissement');
+  if(N.laveGlace==="Mauvais") appoint('lave-glace');
+  if(N.huile==="Mauvais") appoint('huile moteur');
+  if(N.frein==="Mauvais") appoint('frein');
+  if(N.direction==="Mauvais") appoint('direction');
+  if(N.embrayage==="Mauvais") appoint('embrayage');
+  if(typeof N.carburantPct==="number" && N.carburantPct<15) out.push('Jauge carburant faible ('+N.carburantPct+'%)');
+  if(N.adbluePresent==="Oui" && typeof N.adbluePct==="number" && N.adbluePct<15) out.push('Jauge AdBlue faible ('+N.adbluePct+'%)');
+  return out;
+}
+function anomaliesPortes(){
+  var out=[];
+  (state.portes||[]).forEach(function(p){
+    if(p.type==="Ridelle"){
+      var a=[]; if(p.ridelle.coulisse==="Mauvais") a.push('coulisse mal'); if(p.ridelle.ferme==="Mauvais") a.push('fermeture mauvaise');
+      if(a.length) out.push((p.lib||'Ridelle')+' — '+a.join(' / '));
+      return;
+    }
+    var a=[]; if(p.fermeture==="Mauvais") a.push('fermeture'+(p.cote?(' '+p.cote):'')); if(p.etancheite==="Mauvais") a.push('étanchéité'+(p.cote?(' '+p.cote):''));
+    if(a.length) out.push(p.lib+' — '+a.join(' / '));
+  });
+  return out;
+}
+function anomaliesChargement(){
+  var out=[];
+  (state.chg?.lignes||[]).forEach(function(l,i){
+    if(l.arrimage==="Non"||l.repartition==="Non"||l.calage==="Non"){
+      var pb=[]; if(l.arrimage==="Non") pb.push("arrimage absent"); if(l.repartition==="Non") pb.push("répartition non conforme"); if(l.calage==="Non") pb.push("calage absent");
+      out.push('Ligne '+(i+1)+' — '+(l.nature||'chargement')+' : '+pb.join(', '));
+    }
+  });
+  return out;
+}
+
+function renderRecap(){
+  footerBar.style.display="none";
+  var faces=["avant","gauche","droite","arriere"],
+      lab={avant:"Avant",gauche:"Côté gauche",droite:"Côté droit",arriere:"Arrière"},
+      imgs=IMAGE_SOURCES[state.setup.type]||IMAGE_SOURCES.voiture;
+
+  var faceHTML = faces.map(function(f){
+    var dots=state.faces[f]||[], noAn=state.faces.none[f];
+    var overlay=dots.map(m=>'<div class="rep-dot" style="left:'+m.xPct+'%;top:'+m.yPct+'%">'+m.id+'</div>').join("");
+    var notes = dots.length
+      ? '<ul>'+dots.sort((a,b)=>a.id-b.id).map(m=>'<li>#'+m.id+' — '+(m.note?esc(m.note):'(sans note)')+'</li>').join("")+'</ul>'
+      : '<p class="hint">'+(noAn?'Aucune anomalie signalée.':'Aucun repère.')+'</p>';
+    return '<div class="section"><strong>'+lab[f]+'</strong><div class="face-stage"><img src="'+(imgs[f]||'')+'">'+overlay+(noAn?'<div class="pill" style="position:absolute;top:6px;left:6px;background:#fff">Aucune anomalie</div>':'')+'</div>'+notes+'</div>';
+  }).join("");
+
+  // Totaux chargement
+  var lignes = (state.chg?.lignes||[]).filter(l => (l.qty||l.nature||l.poids));
+  var totalChg = lignes.reduce((s,l)=> s + (+l.qty||0) * (+l.poids||0), 0);
+
+  // Capacité dispo = PTAC - PV (si dispo)
+  var pv   = +((state.setup?.tare?.pv)||0);
+  var ptac = +((state.setup?.tare?.ptac)||0);
+  var capaciteDispo = (ptac>0 && pv>=0) ? (ptac - pv) : null;
+  var surcharge = (capaciteDispo!=null) ? (totalChg > capaciteDispo) : false;
+
+  // Étanchéité intérieure
+  var I = state.chg?.interieur || null;
+  var msgHumidite = (I && I.etanche==="Non")
+    ? '<p style="color:var(--danger);margin-top:6px">L’humidité peut être particulièrement préjudiciable aux produits sensibles.</p>'
+    : '';
+
+  elContent.innerHTML =
+    '<div class="card">'+
+      '<h3>Récapitulatif</h3>'+
+      '<div class="kv" style="margin-bottom:10px">'+
+        '<div>Type</div><div>'+esc(state.setup.type||"—")+'</div>'+
+        '<div>Immatriculation</div><div>'+esc(state.setup.immat||"—")+'</div>'+
+        '<div>Marque / Modèle</div><div>'+esc(state.setup.marque||"—")+' '+esc(state.setup.modele||"")+'</div>'+
+        '<div>Boîte</div><div>'+esc(state.setup.boite||"—")+'</div>'+
+      '</div>'+
+      recapSection('Documents & accessoires', anomaliesDocs())+
+      '<h3>Inspection de carrosserie</h3><div class="faces-grid">'+faceHTML+'</div>'+
+      recapSection('Pneumatiques', anomaliesPneus())+
+      recapSection('Feux', anomaliesFeux())+
+      recapSection('Vitrages', anomaliesVitrages())+
+      recapSection('Rétroviseurs', anomaliesRetros())+
+      recapSection('Niveaux', anomaliesNiveaux())+
+      recapSection('Portes', anomaliesPortes())+
+      (function(){
+        var html = '<h3>Chargement</h3>';
+        if(lignes.length){
+          html += '<table style="width:100%;border-collapse:collapse"><thead>'+
+                  '<tr style="background:#eef3ff"><th style="text-align:left">Nombre</th><th style="text-align:left">Nature</th><th style="text-align:left">Poids unitaire (kg)</th></tr>'+
+                  '</thead><tbody>';
+          lignes.forEach(function(l){
+            html += '<tr><td>'+esc(l.qty||"")+'</td><td>'+esc(l.nature||"")+'</td><td>'+esc(l.poids||"")+'</td></tr>';
+          });
+          html += '</tbody></table>';
+
+          // Ligne total + capacité + alerte surcharge le cas échéant
+          var totalLine = '<p style="text-align:right;margin-top:6px">Total estimé : <strong'+(surcharge?' style="color:var(--danger)"':'')+'>'+totalChg.toFixed(1)+'</strong> kg</p>';
+          var capaLine  = (capaciteDispo!=null)
+                          ? '<p class="hint" style="text-align:right;margin:-4px 0 6px">Capacité utile (PTAC − PV) : <strong>'+capaciteDispo.toFixed(1)+'</strong> kg</p>'
+                          : '';
+          var alertLine = surcharge ? '<p style="color:var(--danger);font-weight:700;text-align:right;margin-top:-2px">SURCHARGE CONSTATÉE</p>' : '';
+          html += capaLine + totalLine + alertLine;
+
+          // Message humidité si étanchéité = Non
+          html += msgHumidite;
+
+        }else{
+          html += '<p class="hint">Aucun chargement saisi.</p>'+msgHumidite;
+        }
+        return html;
+      })()+
+    '</div>'+
+    // Barre d’actions (non imprimée)
+    '<div class="print-bar no-print">'+
+      '<button class="btn" onclick="window.print()">Imprimer / PDF</button>'+
+      '<button class="btn" onclick="location.reload()">Recommencer</button>'+
+    '</div>';
+}
+
+</script>
+</body>
+</html>
