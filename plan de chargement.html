@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Plan de chargement – Config véhicule + palettes</title>
+<style>
+  :root{ --gap:24px; --card:#f8f9fb; --grey:#ddd; --cab:#e5e5e5; --draw:#8a8a8a; }
+  body{ font-family:system-ui, sans-serif; margin:20px; }
+  h1{ margin:0 0 12px }
+  .hidden{ display:none !important; }
+  .card{ background:var(--card); border:1px solid #e6e8eb; border-radius:12px; padding:12px; }
+  .layout{ display:grid; grid-template-columns: 1fr 360px; gap:var(--gap); align-items:start; }
+  .board-col{ display:flex; flex-direction:column; gap:16px; }
+  .strip{ position:relative; overflow-x:auto; overflow-y:hidden; padding-bottom:8px; border-bottom:1px dashed #e2e2e2;}
+  .row{ display:flex; flex-wrap:nowrap; align-items:flex-start; gap:16px; }
+  .bay-wrap{ display:flex; flex-direction:column; gap:6px; }
+  .bay-title{ font-weight:600; }
+  .bay{
+    position:relative; border:2px solid #333;
+    background:repeating-linear-gradient(to right,#fafafa 0 20px,#f0f0f0 20px 40px);
+    width:1000px; height:200px; overflow:hidden;
+  }
+  .gridY{
+    position:absolute; inset:0;
+    background:repeating-linear-gradient(to bottom,transparent 0 20px,rgba(0,0,0,.04) 20px 21px);
+    pointer-events:none;
+  }
+  .bay-labels{ display:flex; justify-content:space-between; font-weight:700; letter-spacing:.5px; }
+
+  .buffer{
+    position:relative; margin:12px auto 0; height:160px; border:2px dashed #888; background:#fff;
+  }
+  .buffer .title{ position:absolute; left:8px; top:4px; font-size:12px; opacity:.7; background:#fff; padding:1px 6px; }
+
+  .stat{ margin:6px 0; }
+  .ok{ color:#146c2e } .warn{ color:#b54708 } .bad{ color:#b42318 }
+
+  .pallet{
+    position:absolute; border:1px solid #555; box-shadow:0 1px 2px rgba(0,0,0,.15);
+    cursor:grab; user-select:none; box-sizing:border-box; border-radius:4px;
+  }
+  .pallet.dragging{ opacity:.9; cursor:grabbing; }
+  .btnbar{ position:absolute; left:4px; top:4px; display:flex; gap:4px; z-index:2; }
+  .btnbar button{
+    width:22px; height:22px; line-height:20px; text-align:center; border:0; border-radius:4px; background:#fff;
+    box-shadow:0 0 0 1px #0003 inset; font-weight:700; cursor:pointer; opacity:.95;
+  }
+  .btnbar button:hover{ opacity:1; }
+
+  /* Carré visuel (hors baies => inchargeable, hors longueur utile) */
+  .vis-square{
+    flex:0 0 auto;
+    background:repeating-linear-gradient(45deg,#ececec 0 8px,#dcdcdc 8px 16px);
+    border:2px dashed #666;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; color:#333;
+    pointer-events:none;
+  }
+
+  .drawbar{
+    background:var(--draw); border:2px solid #555; border-radius:6px;
+    width:100px; height:30px; align-self:center; flex:0 0 auto;
+  }
+
+  @media (max-width:1200px){
+    .bay{ width:92vw; }
+  }
+
+  .setup{ max-width:1000px; margin:0 auto 16px; }
+  .setup .grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .setup label{ display:block; margin:6px 0; }
+  .right { text-align:right }
+
+  .slots table{ width:100%; border-collapse:collapse; }
+  .slots th, .slots td{ padding:6px 8px; border-bottom:1px solid #e6e6e6; font-size:13px; }
+  .slots td.actions{ white-space:nowrap; text-align:right; }
+  .slots button{ margin-left:6px; }
+
+  footer{ margin-top:28px; font-size:12px; opacity:.9; text-align:center }
+</style>
+</head>
+<body>
+<h1>Plan de chargement – palettes</h1>
+
+<!-- ===== CONFIG ===== -->
+<div id="setup" class="card setup">
+  <h3>Configuration du véhicule</h3>
+  <label>
+    Type d’ensemble :
+    <select id="cfgEnsemble">
+      <option value="isole">Véhicule isolé (Porteur)</option>
+      <option value="art_p_rem">Articulé : Porteur + Remorque</option>
+      <option value="art_t_semi">Articulé : Tracteur + Semi-remorque</option>
+    </select>
+  </label>
+
+  <div class="grid">
+    <div class="card" style="background:#fff">
+      <h4 id="partA_title" style="margin:0 0 8px">Porteur</h4>
+      <label>Longueur utile (mm) <input id="partA_len" type="number" value="12000" min="1000" step="100"></label>
+      <label>Largeur utile (mm)  <input id="partA_wid" type="number" value="2600" min="1000" step="10"></label>
+      <label>Nombre d’essieux
+        <select id="partA_axles"><option>2</option><option>3</option><option>4</option><option>5</option></select>
+      </label>
+      <hr>
+      <label>PV (kg)   <input id="partA_pv" type="number" value="9000"></label>
+      <label>PTAC (kg) <input id="partA_ptac" type="number" value="19000"></label>
+      <div id="partA_ptra_row"><label>PTRA (kg) <input id="partA_ptra" type="number" value="38000"></label></div>
+    </div>
+
+    <div id="partB_box" class="card" style="background:#fff; display:none">
+      <h4 id="partB_title" style="margin:0 0 8px">Remorque / Semi</h4>
+      <label>Longueur utile (mm) <input id="partB_len" type="number" value="12000" min="1000" step="100"></label>
+      <label>Largeur utile (mm)  <input id="partB_wid" type="number" value="2600" min="1000" step="10"></label>
+      <label>Nombre d’essieux
+        <select id="partB_axles"><option>2</option><option>3</option><option>4</option><option>5</option></select>
+      </label>
+      <hr>
+      <label>PV (kg)   <input id="partB_pv" type="number" value="7000"></label>
+      <label>PTAC (kg) <input id="partB_ptac" type="number" value="27000"></label>
+    </div>
+  </div>
+
+  <small id="ruleNote" style="display:block; opacity:.8; margin:6px 0 10px"></small>
+
+  <div style="font-size:12px; opacity:.9; margin:8px 0 12px; text-align:center;">
+    logiciel créé et proposé par <b>M.CHAZEL</b>, professeur de conduite routière en lycée professionnel
+  </div>
+
+  <button id="cfgApply">Valider la configuration</button>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app" class="hidden">
+  <div class="layout">
+    <div class="board-col">
+      <div class="card" style="display:flex; gap:8px; align-items:center; justify-content:flex-start; flex-wrap:wrap;">
+        <button id="btnPng">Exporter en image (PNG)</button>
+        <button id="btnPdf">Exporter en PDF</button>
+      </div>
+
+      <!-- bande horizontale unique -->
+      <div class="strip" id="exportArea">
+        <div id="ensembleRow" class="row"><!-- inject --></div>
+      </div>
+
+      <!-- Zone tampon -->
+      <div class="card">
+        <div class="bay-title">Zone tampon (parking)</div>
+        <div id="buffer" class="buffer" aria-label="zone tampon">
+          <div class="title">Préparez vos palettes ici puis glissez-les dans la/les baies. AVANT = à droite.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panneau droit -->
+    <div class="controls">
+      <div class="card">
+        <h3 style="display:flex; justify-content:space-between; align-items:center">
+          <span>Infos</span>
+          <span id="pmaBox" class="right" title="Poids Maximum Autorisé">PMA: — kg</span>
+        </h3>
+        <div class="stat"><b>Charge Utile (CU)</b> : <span id="cuBox">— kg</span></div>
+        <div class="stat"><b>Chargement total</b> : <span id="payloadBox">— kg</span></div>
+      </div>
+
+      <div class="card">
+        <details open>
+          <summary><b>Ajouter palette</b></summary>
+          <div style="margin-top:8px">
+            <label>Largeur (mm) <input id="pw" type="number" value="1200"></label><br>
+            <label>Profondeur (mm) <input id="pd" type="number" value="800"></label><br>
+            <label>Masse (kg) <input id="pm" type="number" value="600"></label><br>
+            <label>Couleur
+              <select id="pc">
+                <option value="#d8eaff">Bleu clair</option>
+                <option value="#c8f7c5">Vert clair</option>
+                <option value="#ffe9a8">Jaune</option>
+                <option value="#ffd0d0">Rose</option>
+                <option value="#e4d1ff">Violet pâle</option>
+                <option value="#c7f0ff">Cyan pâle</option>
+                <option value="#ffe1c4">Orange pâle</option>
+                <option value="#e0e0e0">Gris</option>
+                <option value="#d0f0e0">Menthe</option>
+                <option value="#f0d0f0">Lilac</option>
+              </select>
+            </label><br>
+            <label>Quantité <input id="pq" type="number" value="1" min="1" max="50"></label><br>
+            <button id="add">Ajouter (dans la zone tampon)</button>
+          </div>
+        </details>
+        <p style="font-size:12px; opacity:.8; margin-top:8px">
+          ⟳ pour <b>pivoter</b> · × pour <b>supprimer</b> · Snap bord & voisins dans <b>tous les sens</b> (grille 100&nbsp;mm).
+        </p>
+      </div>
+
+      <!-- Sauvegardes -->
+      <div class="card slots">
+        <h3>Sauvegardes (10 emplacements)</h3>
+        <table id="slotsTable">
+          <thead><tr><th>#</th><th>Nom</th><th>Dernière modif</th><th class="right">Actions</th></tr></thead>
+          <tbody><!-- rows inject --></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer>logiciel créé et proposé par <b>M.CHAZEL</b>, professeur de conduite routière en lycée professionnel</footer>
+</div>
+
+<!-- libs export -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<script>
+/* ===== Helpers ===== */
+const $ = s => document.querySelector(s);
+const ruleNote = $('#ruleNote');
+const ensembleRow = $('#ensembleRow');
+const bufferEl = $('#buffer');
+const pmaBox = $('#pmaBox'), cuBox = $('#cuBox'), payloadBox = $('#payloadBox');
+const exportArea = $('#exportArea');
+
+const containers = new Map(); // Element -> {length_mm,width_mm,axles}
+let config = null;
+
+/* Échelles mm<->px */
+function mm2pxX(mm,c){ return mm * (c.clientWidth  / containers.get(c).length_mm); }
+function mm2pxY(mm,c){ return mm * (c.clientHeight / containers.get(c).width_mm); }
+function px2mmX(px,c){ return px * (containers.get(c).length_mm / c.clientWidth); }
+function px2mmY(px,c){ return px * (containers.get(c).width_mm  / c.clientHeight); }
+
+/* UI config */
+const cfgEnsemble = $('#cfgEnsemble');
+const partA_title = $('#partA_title'), partB_title = $('#partB_title'), partB_box = $('#partB_box'), partA_ptra_row = $('#partA_ptra_row');
+const partA_len = $('#partA_len'), partA_wid = $('#partA_wid'), partB_len = $('#partB_len'), partB_wid = $('#partB_wid');
+
+function setLimitsByMode(){
+  const mode = cfgEnsemble.value;
+  if(mode==='isole'){
+    partA_title.textContent = 'Porteur';
+    partB_box.style.display = 'none';
+    partA_ptra_row.style.display = '';
+    partA_len.max = 12000; partA_wid.max = 2600;
+    ruleNote.textContent = 'Isolé : Longueur utile ≤ 12,0 m ; Largeur utile ≤ 2,60 m.';
+  }else if(mode==='art_p_rem'){
+    partA_title.textContent = 'Porteur (avant)';
+    partB_title.textContent = 'Remorque (derrière)';
+    partB_box.style.display = '';
+    partA_ptra_row.style.display = '';
+    partA_len.max = 12000; partA_wid.max = 2600;
+    partB_len.max = 12000; partB_wid.max = 2600;
+    ruleNote.textContent = 'Porteur + Remorque : chaque partie ≤ 12,0 m ; largeur ≤ 2,60 m.';
+  }else{
+    partA_title.textContent = 'Tracteur (ne charge pas)';
+    partB_title.textContent = 'Semi-remorque (derrière)';
+    partB_box.style.display = '';
+    partA_ptra_row.style.display = '';
+    partB_len.max = 13300; partB_wid.max = 2600;
+    ruleNote.textContent = 'Tracteur + Semi : Semi ≤ 13,3 m ; largeur ≤ 2,60 m. Tracteur non chargeable.';
+  }
+}
+cfgEnsemble.addEventListener('change', setLimitsByMode);
+setLimitsByMode();
+
+/* ===== Règles PMA/CU ===== */
+function roadMaxByAxles(totalAxles){
+  if(totalAxles>=5) return 44000;
+  if(totalAxles===4) return 38000;
+  if(totalAxles===3) return 32000;
+  return 18000;
+}
+function computePMA(cfg){
+  if(cfg.mode==='isole') return cfg.A.PTAC;
+  const totalAxles = (cfg.A.axles||0) + (cfg.B?.axles||0);
+  const roadMax = roadMaxByAxles(totalAxles);
+  if(cfg.mode==='art_p_rem'){
+    return Math.min(cfg.A.PTRA||Infinity, (cfg.A.PTAC + cfg.B.PTAC)||Infinity, roadMax);
+  }else{
+    return Math.min(cfg.A.PTRA||Infinity, (cfg.A.PV + cfg.B.PTAC)||Infinity, roadMax);
+  }
+}
+function computeCU(cfg, PMA){
+  if(cfg.mode==='isole') return PMA - cfg.A.PV;
+  return PMA - (cfg.A.PV + (cfg.B?.PV||0));
+}
+
+/* ===== Construction ===== */
+let bayIds = []; // clés stables: 'bayA','bayB'
+function makeContainerCfg(length_mm,width_mm,axles){ return { length_mm, width_mm, axles }; }
+function createBay(label, length_mm, width_mm, axles, key){
+  const wrap = document.createElement('div'); wrap.className = 'bay-wrap';
+  const title = document.createElement('div'); title.className='bay-title'; title.textContent = label;
+  const bay = document.createElement('div'); bay.className='bay'; bay.dataset.key = key;
+  const grid = document.createElement('div'); grid.className='gridY'; bay.appendChild(grid);
+  const labels = document.createElement('div'); labels.className='bay-labels'; labels.innerHTML = '<span>ARRIÈRE</span><span>AVANT</span>';
+  wrap.appendChild(title); wrap.appendChild(bay); wrap.appendChild(labels);
+  bay.style.width = '1000px';
+  bay.style.height = `${Math.max(160, Math.round(200 * width_mm/2600))}px`;
+  containers.set(bay, makeContainerCfg(length_mm, width_mm, axles));
+  return {wrap, bay};
+}
+function createRightSquareFor(bay, label){
+  const h = bay.clientHeight;
+  const t = bay.offsetTop;
+  const sq = document.createElement('div');
+  sq.className = 'vis-square';
+  sq.style.width  = h + 'px';
+  sq.style.height = h + 'px';
+  sq.style.marginTop = t + 'px'; // aligne verticalement sur le haut de la baie
+  sq.textContent = label;
+  return sq;
+}
+function makeDrawbarBetween(remBay, portBay){
+  const rect = document.createElement('div'); rect.className='drawbar';
+  const portLenPx = portBay.clientWidth;
+  const portHeiPx = portBay.clientHeight;
+  rect.style.width  = Math.max(24, Math.round(portLenPx * 0.10)) + 'px';
+  rect.style.height = Math.max(16, Math.round(portHeiPx * 0.20)) + 'px';
+  return rect;
+}
+
+/* ===== Validation config : construit l’axe ===== */
+$('#cfgApply').addEventListener('click', ()=>{
+  const mode = $('#cfgEnsemble').value;
+  const clamp = (v,min,max)=>Math.max(min,Math.min(v,max));
+
+  // Partie A
+  let A_len = +$('#partA_len').value || 12000;
+  let A_wid = +$('#partA_wid').value || 2600;
+  if(mode==='isole' || mode==='art_p_rem'){ A_len = clamp(A_len, 1000, 12000); A_wid = clamp(A_wid, 1000, 2600); }
+  const A = {
+    type: (mode==='isole' || mode==='art_p_rem') ? 'porteur' : 'tracteur',
+    length_mm: A_len, width_mm: A_wid,
+    axles: parseInt($('#partA_axles').value,10),
+    PV:+$('#partA_pv').value||0, PTAC:+$('#partA_ptac').value||0, PTRA:+$('#partA_ptra').value||0
+  };
+
+  // Partie B si articulé
+  let B=null;
+  if(mode!=='isole'){
+    let B_len = +$('#partB_len').value || (mode==='art_t_semi'?13300:12000);
+    let B_wid = +$('#partB_wid').value || 2600;
+    if(mode==='art_p_rem'){ B_len = clamp(B_len, 1000, 12000); B_wid = clamp(B_wid, 1000, 2600); }
+    if(mode==='art_t_semi'){ B_len = clamp(B_len, 1000, 13300); B_wid = clamp(B_wid, 1000, 2600); }
+    B = {
+      type: (mode==='art_p_rem') ? 'remorque' : 'semi',
+      length_mm: B_len, width_mm: B_wid,
+      axles: parseInt($('#partB_axles').value,10),
+      PV:+$('#partB_pv').value||0, PTAC:+$('#partB_ptac').value||0
+    };
+  }
+
+  config = { mode, A, B };
+
+  // Reset rangée
+  ensembleRow.innerHTML = '';
+  containers.clear();
+  bayIds = [];
+
+  if(mode==='isole'){
+    const port = createBay('Porteur', A.length_mm, A.width_mm, A.axles, 'bayA');
+    ensembleRow.appendChild(port.wrap);
+    setTimeout(()=> ensembleRow.insertBefore(createRightSquareFor(port.bay,'CABINE'), port.wrap.nextSibling), 0);
+    bayIds = ['bayA'];
+  }else if(mode==='art_p_rem'){
+    const rem  = createBay('Remorque (derrière)', B.length_mm, B.width_mm, B.axles, 'bayB');
+    const port = createBay('Porteur (avant)',    A.length_mm, A.width_mm, A.axles, 'bayA');
+    const draw = makeDrawbarBetween(rem.bay, port.bay);
+    ensembleRow.appendChild(rem.wrap);
+    ensembleRow.appendChild(draw);
+    ensembleRow.appendChild(port.wrap);
+    setTimeout(()=> ensembleRow.insertBefore(createRightSquareFor(port.bay,'CABINE'), port.wrap.nextSibling), 0);
+    bayIds = ['bayB','bayA'];
+  }else{
+    const semi = createBay('Semi-remorque (derrière)', B.length_mm, B.width_mm, B.axles, 'bayB');
+    ensembleRow.appendChild(semi.wrap);
+    setTimeout(()=> ensembleRow.insertBefore(createRightSquareFor(semi.bay,'TRACTEUR'), semi.wrap.nextSibling), 0);
+    bayIds = ['bayB'];
+  }
+
+  // Buffer = plus grand
+  setTimeout(resizeBufferToMax, 0);
+
+  // PMA & CU
+  const PMA = computePMA(config);
+  pmaBox.textContent = `PMA: ${fmt(PMA)} kg`;
+  const CU = computeCU(config, PMA);
+  cuBox.textContent = `${fmt(CU)} kg`;
+
+  $('#setup').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+
+  computeAndRender();
+  renderSlotsTable();
+});
+
+/* ===== Zone tampon = largeur max ===== */
+function resizeBufferToMax(){
+  const bays = Array.from(document.querySelectorAll('.bay'));
+  let maxWidth = 600;
+  for(const b of bays) maxWidth = Math.max(maxWidth, b.clientWidth);
+  bufferEl.style.width = maxWidth + 'px';
+}
+
+/* ===== Palettes & drag ===== */
+let pallets = [];
+let counter = 1;
+const GRID_MM = 100;
+const SNAP_TOL = 3;
+
+function rectFromEl(el,c){
+  const r = el.getBoundingClientRect(), rc=c.getBoundingClientRect();
+  return { x:r.left-rc.left, y:r.top-rc.top, w:r.width, h:r.height };
+}
+function overlap(a,b){
+  return !( a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y );
+}
+function rangesOverlap(a1,a2,b1,b2){ return !(a2 <= b1 || b2 <= a1); }
+function anyCollision(c,testRect,ignoreId){
+  for(const q of pallets){
+    if(q.container!==c || q.id===ignoreId) continue;
+    const rq = rectFromEl(q.el,c);
+    if(overlap(testRect,rq)) return true;
+  }
+  return false;
+}
+function inContainer(c,left,top,w,h){
+  return left >= 0 && top >= 0 && left + w <= c.clientWidth && top + h <= c.clientHeight;
+}
+function snapToNeighbors(c,left,top,w,h,ignoreId){
+  if (Math.abs(left - 0) <= SNAP_TOL) left = 0;
+  if (Math.abs((left+w) - c.clientWidth) <= SNAP_TOL) left = c.clientWidth - w;
+  if (Math.abs(top - 0) <= SNAP_TOL) top = 0;
+  if (Math.abs((top+h) - c.clientHeight) <= SNAP_TOL) top = c.clientHeight - h;
+  for(const q of pallets){
+    if(q.container!==c || q.id===ignoreId) continue;
+    const r = rectFromEl(q.el,c);
+    if (Math.abs((left+w) - r.x) <= SNAP_TOL && rangesOverlap(top, top+h, r.y, r.y+r.h)) left = r.x - w;
+    if (Math.abs(left - (r.x + r.w)) <= SNAP_TOL && rangesOverlap(top, top+h, r.y, r.y+r.h)) left = r.x + r.w;
+    if (Math.abs((top+h) - r.y) <= SNAP_TOL && rangesOverlap(left, left+w, r.x, r.x+r.w)) top = r.y - h;
+    if (Math.abs(top - (r.y + r.h)) <= SNAP_TOL && rangesOverlap(left, left+w, r.x, r.x+r.w)) top = r.y + r.h;
+  }
+  return {left, top};
+}
+function hitContainer(screenX,screenY){
+  const list=[...document.querySelectorAll('.bay'), bufferEl];
+  for(const c of list){
+    const r=c.getBoundingClientRect();
+    if(screenX>=r.left && screenX<=r.right && screenY>=r.top && screenY<=r.bottom){
+      return c;
+    }
+  }
+  return null;
+}
+
+function createPallet(w_mm=1200,d_mm=800,mass_kg=600,color='#d8eaff',x_mm=0,y_mm=0,container=bufferEl){
+  const id = `P${counter++}`;
+  const el = document.createElement('div');
+  el.className='pallet'; el.dataset.id=id; el.style.background=color;
+
+  const btnbar = document.createElement('div'); btnbar.className='btnbar';
+  const btnDel = document.createElement('button'); btnDel.type='button'; btnDel.title='Supprimer'; btnDel.textContent='×';
+  const btnRot = document.createElement('button'); btnRot.type='button'; btnRot.title='Pivoter 90°'; btnRot.textContent='⟳';
+  btnbar.appendChild(btnDel); btnbar.appendChild(btnRot);
+  el.appendChild(btnbar);
+
+  container.appendChild(el);
+
+  const p = { id,w_mm,d_mm,mass_kg,x_mm,y_mm,el,container,color };
+  pallets.push(p);
+
+  layoutPallet(p);
+  makeDraggable(p);
+
+  btnDel.addEventListener('click',(e)=>{ e.stopPropagation(); removePallet(id); });
+  btnRot.addEventListener('click',(e)=>{ e.stopPropagation(); rotatePallet(id); });
+
+  computeAndRender();
+}
+function layoutPallet(p){
+  const c=p.container;
+  p.el.style.width  = `${mm2pxX(p.w_mm,c)}px`;
+  p.el.style.height = `${mm2pxY(p.d_mm,c)}px`;
+  p.el.style.left   = `${mm2pxX(p.x_mm,c)}px`;
+  p.el.style.top    = `${mm2pxY(p.y_mm,c)}px`;
+  p.el.style.background = p.color;
+}
+function makeDraggable(p){
+  let startX=0,startY=0,elX=0,elY=0,dragging=false;
+
+  p.el.addEventListener('pointerdown',(e)=>{
+    if (e.target.closest('.btnbar')) return;
+    dragging=true; p.el.setPointerCapture(e.pointerId);
+    p.el.classList.add('dragging');
+    startX=e.clientX; startY=e.clientY;
+    const r = rectFromEl(p.el,p.container); elX=r.x; elY=r.y;
+  });
+
+  window.addEventListener('pointermove',(e)=>{
+    if(!dragging) return;
+    const dx=e.clientX-startX, dy=e.clientY-startY;
+    let left=elX+dx, top=elY+dy;
+
+    const mmX = Math.round(px2mmX(left,p.container)/GRID_MM)*GRID_MM;
+    const mmY = Math.round(px2mmY(top ,p.container)/GRID_MM)*GRID_MM;
+    left = mm2pxX(mmX,p.container); top = mm2pxY(mmY,p.container);
+
+    const br = rectFromEl(p.el,p.container); let w=br.w, h=br.h;
+    ({left,top}=snapToNeighbors(p.container,left,top,w,h,p.id));
+    left=Math.max(0,Math.min(left,p.container.clientWidth - w));
+    top =Math.max(0,Math.min(top ,p.container.clientHeight - h));
+
+    const testRect={x:left,y:top,w,h};
+    if(!anyCollision(p.container,testRect,p.id) && inContainer(p.container,left,top,w,h)){
+      p.el.style.left=`${left}px`; p.el.style.top=`${top}px`;
+    }
+
+    const cand = hitContainer(e.clientX,e.clientY);
+    if(cand && cand!==p.container){
+      const curLeft=parseFloat(p.el.style.left)||0, curTop=parseFloat(p.el.style.top)||0;
+      const mmLeft=px2mmX(curLeft,p.container), mmTop=px2mmY(curTop,p.container);
+      cand.appendChild(p.el);
+      p.container=cand;
+      layoutPallet(p);
+      let newLeft=mm2pxX(mmLeft,p.container), newTop=mm2pxY(mmTop,p.container);
+      const br2=rectFromEl(p.el,p.container);
+      ({left:newLeft, top:newTop}=snapToNeighbors(p.container,newLeft,newTop,br2.w,br2.h,p.id));
+      newLeft=Math.max(0,Math.min(newLeft,p.container.clientWidth-br2.w));
+      newTop =Math.max(0,Math.min(newTop ,p.container.clientHeight-br2.h));
+      p.el.style.left=`${newLeft}px`; p.el.style.top=`${newTop}px`;
+    }
+  });
+
+  window.addEventListener('pointerup',()=>{
+    if(!dragging) return;
+    dragging=false; p.el.classList.remove('dragging');
+    p.x_mm = Math.round(px2mmX(parseFloat(p.el.style.left)||0,p.container)/GRID_MM)*GRID_MM;
+    p.y_mm = Math.round(px2mmY(parseFloat(p.el.style.top)||0 ,p.container)/GRID_MM)*GRID_MM;
+    p.el.style.left=`${mm2pxX(p.x_mm,p.container)}px`;
+    p.el.style.top =`${mm2pxY(p.y_mm,p.container)}px`;
+    computeAndRender();
+  });
+}
+function removePallet(id){
+  const i=pallets.findIndex(q=>q.id===id);
+  if(i>=0){ pallets[i].el.remove(); pallets.splice(i,1); computeAndRender(); }
+}
+function rotatePallet(id){
+  const p=pallets.find(q=>q.id===id); if(!p) return;
+  const new_w_mm=p.d_mm, new_d_mm=p.w_mm;
+  let left=parseFloat(p.el.style.left)||0, top=parseFloat(p.el.style.top)||0;
+  const wpx_new=mm2pxX(new_w_mm,p.container), hpx_new=mm2pxY(new_d_mm,p.container);
+
+  ({left,top}=snapToNeighbors(p.container,left,top,wpx_new,hpx_new,p.id));
+  left=Math.max(0,Math.min(left,p.container.clientWidth-wpx_new));
+  top =Math.max(0,Math.min(top ,p.container.clientHeight-hpx_new));
+
+  const testRect={x:left,y:top,w:wpx_new,h:hpx_new};
+  if(inContainer(p.container,left,top,wpx_new,hpx_new) && !anyCollision(p.container,testRect,p.id)){
+    p.w_mm=new_w_mm; p.d_mm=new_d_mm;
+    p.x_mm=Math.round(px2mmX(left,p.container)/GRID_MM)*GRID_MM;
+    p.y_mm=Math.round(px2mmY(top ,p.container)/GRID_MM)*GRID_MM;
+    layoutPallet(p);
+    p.el.style.left=`${mm2pxX(p.x_mm,p.container)}px`;
+    p.el.style.top =`${mm2pxY(p.y_mm,p.container)}px`;
+    computeAndRender();
+  }else{
+    p.el.animate([{outline:'2px solid #b42318'},{outline:'0 solid transparent'}],{duration:400,easing:'ease-out'});
+  }
+}
+
+/* ===== Calculs ===== */
+function fmt(n){ return Number.isFinite(n)? n.toFixed(0) : '—'; }
+function computeBay(container){
+  const items=pallets.filter(p=>p.container===container);
+  const payload=items.reduce((s,p)=>s+p.mass_kg,0);
+  return {payload};
+}
+function computeAndRender(){
+  if(!config) return;
+  const bays = Array.from(document.querySelectorAll('.bay'));
+  let payloadTotal = 0;
+  for(const b of bays){
+    const {payload} = computeBay(b);
+    payloadTotal += payload;
+  }
+  const PMA = computePMA(config);
+  const CU  = computeCU(config, PMA);
+  pmaBox.textContent = `PMA: ${fmt(PMA)} kg`;
+  cuBox.textContent = `${fmt(CU)} kg`;
+  payloadBox.innerHTML = `<b class="${payloadTotal<=CU?'ok':(payloadTotal<=CU*1.05?'warn':'bad')}">${fmt(payloadTotal)} kg</b>`;
+}
+
+/* ===== Ajouter palettes ===== */
+$('#add').addEventListener('click', ()=>{
+  const w= +$('#pw').value || 1200;
+  const d= +$('#pd').value || 800;
+  const m= +$('#pm').value || 600;
+  const color = $('#pc').value || '#d8eaff';
+  const q = Math.max(1, Math.min(50, +($('#pq').value)||1));
+
+  const bays = Array.from(document.querySelectorAll('.bay'));
+  let maxLen = 13300, maxWid = 2600;
+  for(const b of bays){
+    const cfg = containers.get(b);
+    if(cfg){ maxLen = Math.max(maxLen, cfg.length_mm); maxWid = Math.max(maxWid, cfg.width_mm); }
+  }
+  containers.set(bufferEl, {length_mm:maxLen, width_mm:maxWid, axles:0});
+  resizeBufferToMax();
+
+  let count = pallets.filter(p=>p.container===bufferEl).length;
+  for(let i=0;i<q;i++){
+    const row = Math.floor(count/4), col = count%4;
+    const x = Math.min(col*(w+100), maxLen - w);
+    const y = Math.min(row*(d+100), maxWid - d);
+    createPallet(w,d,m,color,x,y,bufferEl);
+    count++;
+  }
+});
+
+/* ====== EXPORT PNG / PDF ====== */
+async function exportPNG(){
+  const el = exportArea;
+  const prevScrollLeft = el.scrollLeft;
+  el.scrollLeft = 0;
+  const canvas = await html2canvas(el, {
+    backgroundColor: '#ffffff',
+    useCORS: true,
+    scale: 2,
+    scrollX: 0, scrollY: 0,
+    width: el.scrollWidth, height: el.clientHeight
+  });
+  el.scrollLeft = prevScrollLeft;
+  const url = canvas.toDataURL('image/png');
+  download(url, `plan-chargement-${Date.now()}.png`);
+}
+async function exportPDF(){
+  const el = exportArea;
+  const prevScrollLeft = el.scrollLeft;
+  el.scrollLeft = 0;
+  const canvas = await html2canvas(el, {
+    backgroundColor: '#ffffff',
+    useCORS: true,
+    scale: 2,
+    scrollX: 0, scrollY: 0,
+    width: el.scrollWidth, height: el.clientHeight
+  });
+  el.scrollLeft = prevScrollLeft;
+  const imgData = canvas.toDataURL('image/png');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  // fit image into page while keeping ratio
+  const ratio = Math.min(pageW / canvas.width, pageH / canvas.height);
+  const w = canvas.width * ratio, h = canvas.height * ratio;
+  const x = (pageW - w) / 2, y = (pageH - h) / 2;
+  doc.addImage(imgData, 'PNG', x, y, w, h);
+  doc.save(`plan-chargement-${Date.now()}.pdf`);
+}
+function download(url, filename){
+  const a = document.createElement('a'); a.href=url; a.download=filename; a.click();
+}
+$('#btnPng').addEventListener('click', exportPNG);
+$('#btnPdf').addEventListener('click', exportPDF);
+
+/* ====== SAUVEGARDES (10 slots) ====== */
+const SLOTS = 10;
+function slotKey(i){ return `loadplanner_slot_${i}`; }
+function serializeState(){
+  // which container key for each bay
+  const bayMap = {};
+  document.querySelectorAll('.bay').forEach(b=>{
+    bayMap[b.dataset.key] = true;
+  });
+  const pals = pallets.map(p=>({
+    w_mm:p.w_mm, d_mm:p.d_mm, mass_kg:p.mass_kg, color:p.color,
+    x_mm:p.x_mm||0, y_mm:p.y_mm||0,
+    containerKey: containerKeyOf(p.container)
+  }));
+  return {
+    version:1,
+    config,
+    pallets: pals
+  };
+}
+function containerKeyOf(containerEl){
+  if(containerEl===bufferEl) return 'buffer';
+  const key = containerEl?.dataset?.key;
+  return key || null;
+}
+function getContainerByKey(key){
+  if(key==='buffer') return bufferEl;
+  return document.querySelector(`.bay[data-key="${key}"]`);
+}
+function clearAllPallets(){
+  pallets.forEach(p=>p.el.remove());
+  pallets = [];
+}
+function rebuildFromState(state){
+  if(!state || !state.config) return;
+  // Remettre la configuration
+  $('#cfgEnsemble').value = state.config.mode;
+  setLimitsByMode();
+  // renseigner inputs
+  $('#partA_len').value = state.config.A.length_mm;
+  $('#partA_wid').value = state.config.A.width_mm;
+  $('#partA_axles').value = state.config.A.axles;
+  $('#partA_pv').value = state.config.A.PV;
+  $('#partA_ptac').value = state.config.A.PTAC;
+  $('#partA_ptra').value = state.config.A.PTRA || 0;
+  if(state.config.B){
+    $('#partB_len').value = state.config.B.length_mm;
+    $('#partB_wid').value = state.config.B.width_mm;
+    $('#partB_axles').value = state.config.B.axles;
+    $('#partB_pv').value = state.config.B.PV;
+    $('#partB_ptac').value = state.config.B.PTAC;
+  }
+  // reconstruit visuel
+  $('#cfgApply').click();
+
+  // buffer scale
+  const bays = Array.from(document.querySelectorAll('.bay'));
+  let maxLen = 13300, maxWid = 2600;
+  for(const b of bays){
+    const cfg = containers.get(b);
+    if(cfg){ maxLen = Math.max(maxLen, cfg.length_mm); maxWid = Math.max(maxWid, cfg.width_mm); }
+  }
+  containers.set(bufferEl, {length_mm:maxLen, width_mm:maxWid, axles:0});
+  resizeBufferToMax();
+
+  // palettes
+  clearAllPallets();
+  for(const q of state.pallets||[]){
+    const cont = getContainerByKey(q.containerKey) || bufferEl;
+    createPallet(q.w_mm, q.d_mm, q.mass_kg, q.color, q.x_mm, q.y_mm, cont);
+  }
+  computeAndRender();
+}
+function renderSlotsTable(){
+  const tbody = document.querySelector('#slotsTable tbody');
+  tbody.innerHTML = '';
+  for(let i=1;i<=SLOTS;i++){
+    const raw = localStorage.getItem(slotKey(i));
+    const data = raw ? JSON.parse(raw) : null;
+    const name = data?.name || '(vide)';
+    const ts = data?.ts ? new Date(data.ts).toLocaleString() : '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i}</td>
+      <td>${name}</td>
+      <td>${ts}</td>
+      <td class="actions">
+        <button data-act="save" data-i="${i}">Enregistrer ici</button>
+        <button data-act="load" data-i="${i}" ${raw?'':'disabled'}>Charger</button>
+        <button data-act="del"  data-i="${i}" ${raw?'':'disabled'}>Supprimer</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+}
+document.addEventListener('click',(e)=>{
+  const btn = e.target.closest('button[data-act]');
+  if(!btn) return;
+  const i = +btn.dataset.i, act = btn.dataset.act;
+  if(act==='save'){
+    if(!config){ alert('Configure d’abord le véhicule.'); return; }
+    const name = prompt('Nom de la sauvegarde :','Partie élève');
+    const payload = { name: name||`Sauvegarde ${i}`, ts: Date.now(), state: serializeState() };
+    localStorage.setItem(slotKey(i), JSON.stringify(payload));
+    renderSlotsTable();
+  }else if(act==='load'){
+    const raw = localStorage.getItem(slotKey(i));
+    if(!raw) return;
+    const payload = JSON.parse(raw);
+    rebuildFromState(payload.state);
+  }else if(act==='del'){
+    localStorage.removeItem(slotKey(i));
+    renderSlotsTable();
+  }
+});
+renderSlotsTable();
+</script>
+</body>
+</html>

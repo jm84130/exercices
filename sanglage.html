@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Arrimage – plateau, marchandises & sangles</title>
+<style>
+  body{margin:16px;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;background:#f6f7fb}
+  .layout{display:grid;grid-template-columns:1fr 380px;gap:16px;align-items:start}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px}
+  canvas{display:block;width:100%;max-width:1100px;height:640px;border:1px solid #e5e7eb;border-radius:12px;background:#fff}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+  label{display:block;margin:6px 0}
+  input[type="number"]{width:120px}
+  button{cursor:pointer}
+  .muted{opacity:.7}
+  .hide{display:none}
+  .pill{display:inline-block;padding:4px 8px;border:1px solid #e5e7eb;border-radius:999px;font-size:12px}
+  footer{margin-top:10px;font-size:12px;text-align:center;color:#6b7280}
+</style>
+</head>
+<body>
+<h1>Arrimage de marchandises</h1>
+
+<div class="layout">
+  <div class="card">
+    <canvas id="cv" width="1100" height="640"></canvas>
+    <footer>logiciel crée et proposé par M.CHAZEL — professeur en lycée professionnel — Académie Aix-Marseille</footer>
+  </div>
+
+  <div class="card">
+    <h3>Ajouter une marchandise</h3>
+    <div class="row">
+      <label>Forme
+        <select id="shape">
+          <option value="rect">Palette (rectangle)</option>
+          <option value="rectHole">Rectangle troué (perçage)</option>
+          <option value="ring">Cercle (anneau)</option>
+        </select>
+      </label>
+
+      <!-- Rectangle -->
+      <span id="rectFields" class="row">
+        <label>Largeur (u) <input id="wRect" type="number" value="1.20" step="0.05" min="0.1"></label>
+        <label>Hauteur (u) <input id="hRect" type="number" value="1.00" step="0.05" min="0.1"></label>
+      </span>
+
+      <!-- Rectangle troué -->
+      <span id="rectHoleFields" class="row hide">
+        <label>Largeur (u) <input id="wHole" type="number" value="1.20" step="0.05" min="0.1"></label>
+        <label>Hauteur (u) <input id="hHole" type="number" value="1.20" step="0.05" min="0.1"></label>
+        <label>R<sub>int</sub> (u) <input id="rHole" type="number" value="0.35" step="0.05" min="0.05"></label>
+      </span>
+
+      <!-- Anneau -->
+      <span id="ringFields" class="row hide">
+        <label>R<sub>ext</sub> (u) <input id="rExt" type="number" value="0.80" step="0.05" min="0.10"></label>
+        <label>R<sub>int</sub> (u) <input id="rInt" type="number" value="0.40" step="0.05" min="0.05"></label>
+      </span>
+
+      <label>Poids (kg) <input id="mass" type="number" value="600" step="10" min="0"></label>
+      <button id="add">Ajouter (sur le plateau)</button>
+    </div>
+
+    <hr>
+    <h3>Arrimage – Sangles</h3>
+    <div class="row">
+      <label>Catégorie (LC, daN)
+        <select id="strapType" title="Choisis la LC (couleur = type)">
+          <option value="500">LC 500</option>
+          <option value="1000">LC 1000</option>
+          <option value="2000">LC 2000</option>
+          <option value="3000" selected>LC 3000</option>
+          <option value="5000">LC 5000</option>
+          <option value="6300">Chaîne LC 6300</option>
+        </select>
+      </label>
+      <span class="pill">Mode: <b id="modeText">Déplacement</b></span>
+    </div>
+    <p class="muted" id="strapHelp">Création en PARTIE 2 (ordre : <b>noir → bleu</b>).</p>
+
+    <hr>
+    <h3>Objet sélectionné</h3>
+    <div id="selInfo" class="muted">Aucun</div>
+    <div class="row">
+      <button id="lockBtn" disabled>⚓ Verrouiller</button>
+      <button id="delBtn"  disabled>✕ Supprimer</button>
+    </div>
+    <p class="muted"><small>Touche <b>Suppr</b> : supprime l’objet sélectionné.</small></p>
+  </div>
+</div>
+
+<script>
+/* =========================
+   PARTIE 1 — SOCLE (semi + objets + dessin segmenté)
+   ========================= */
+
+/* Canvas & repère */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const U = 60, M_LEFT = 80, M_BOTTOM = 120;
+const toPxX = x => x*U + M_LEFT;
+const toPxY = y => cv.height - (y*U + M_BOTTOM);
+function mouseToCanvas(e){
+  const r=cv.getBoundingClientRect(); const sx=cv.width/r.width, sy=cv.height/r.height;
+  return {x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy};
+}
+
+/* Semi rehaussée +2 (plateau et ancrages véhicule) */
+const deck = { x0:0, x1:13, y0:3, y1:3.5 };
+const anchors=[]; for(let x=0.25;x<13;x+=0.25) anchors.push({x:+x.toFixed(2), y:3.25});
+const circles=[{x:12,y:2.5,r:0.5},{x:10.5,y:2.5,r:0.5},{x:9,y:2.5,r:0.5}];
+
+function drawSemi(){
+  ctx.save(); ctx.lineWidth=2; ctx.strokeStyle='#000';
+  for(const c of circles){ ctx.beginPath(); ctx.arc(toPxX(c.x), toPxY(c.y), c.r*U, 0, Math.PI*2); ctx.stroke(); }
+  ctx.restore();
+  ctx.lineWidth=2; ctx.strokeStyle='#000';
+  const x=toPxX(deck.x0), y=toPxY(deck.y1), w=(deck.x1-deck.x0)*U, h=(deck.y1-deck.y0)*U;
+  ctx.strokeRect(x,y,w,h);
+  ctx.fillStyle='#000';
+  for(const a of anchors){ ctx.beginPath(); ctx.arc(toPxX(a.x), toPxY(a.y), 3, 0, Math.PI*2); ctx.fill(); }
+}
+
+/* Marchandises */
+let items=[]; // {id,type,x,y,w,h,mass,locked,anchors:[],meta:{...}, _needMass,_score,_why,_segments:[]}
+let counter=1;
+let selected=null;
+
+/* ancrages des marchandises */
+function computeCargoAnchors(it){
+  const pts = [];
+  const step = 0.2; // espacement horizontal des points d’ancrage sur le haut
+
+  if (it.type === 'rect' || it.type === 'rectHole') {
+    // Rangée supérieure régulière (haut de la pièce)
+    const topY = it.y + it.h;
+    for (let x = it.x + step/2; x < it.x + it.w - 1e-6; x += step) {
+      pts.push({ x, y: topY });
+    }
+
+    // Pour "rectHole" : seulement 2 points symétriques sur le cercle intérieur en bas
+    if (it.type === 'rectHole') {
+      const cx = it.x + it.w / 2;
+      const cy = it.y + it.h / 2;
+      const r  = it.meta.rInt;
+      // deux points à ±30° autour du bas
+      const a1 = Math.PI + Math.PI / 6;      // 210°
+      const a2 = 2 * Math.PI - Math.PI / 6;  // 330°
+      pts.push({ x: cx + r * Math.cos(a1), y: cy + r * Math.sin(a1) });
+      pts.push({ x: cx + r * Math.cos(a2), y: cy + r * Math.sin(a2) });
+    }
+
+  } else if (it.type === 'ring') {
+    // Anneau : seulement 2 points symétriques sur le bord intérieur en bas
+    const cx = it.x + it.w / 2;
+    const cy = it.y + it.h / 2;
+    const r  = it.meta.rInt;
+    const a1 = Math.PI + Math.PI / 6;
+    const a2 = 2 * Math.PI - Math.PI / 6;
+    pts.push({ x: cx + r * Math.cos(a1), y: cy + r * Math.sin(a1) });
+    pts.push({ x: cx + r * Math.cos(a2), y: cy + r * Math.sin(a2) });
+  }
+
+  it.anchors = pts;
+}
+
+/* couleurs état */
+function colorByScore(s){ return s>=3?'#22c55e':s===2?'#eab308':s===1?'#f59e0b':'#ef4444'; }
+
+/* dessin marchandise (avec anneau “vrai” + rect/rectHole inchangés) */
+function drawItem(it){
+  const left=toPxX(it.x), bottom=toPxY(it.y), W=it.w*U, H=it.h*U;
+
+  // ——— CAS SPÉCIAL : ANNEAU ———
+  if(it.type==='ring'){
+    const cx = left + W/2;
+    const cy = bottom - H/2;
+    const Rext = W/2;                 // cercle extérieur = largeur/2
+    const Rint = Math.max(2, it.meta.rInt*U); // rayon intérieur en px (mini 2px)
+
+    // 1) disque plein (extérieur)
+    ctx.save();
+    ctx.fillStyle = colorByScore(it._score||0);
+    ctx.beginPath();
+    ctx.arc(cx, cy, Rext, 0, Math.PI*2);
+    ctx.fill();
+
+    // 2) évidement intérieur
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(cx, cy, Rint, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    // 3) traits de contour (extérieur + intérieur) pour la lisibilité
+    ctx.beginPath(); ctx.arc(cx, cy, Rext, 0, Math.PI*2); ctx.strokeStyle='#444'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, Rint, 0, Math.PI*2); ctx.strokeStyle='#444'; ctx.lineWidth=1.0; ctx.stroke();
+
+    // Labels (poids + score)
+    ctx.fillStyle='#000'; ctx.font='12px system-ui'; ctx.textAlign='center';
+    const needLabel = (it._needMass!=null && Math.abs(it._needMass - it.mass) > 1e-6) ? ` (Σ ${Math.round(it._needMass)} kg)` : '';
+    ctx.fillText(`${it.mass} kg${needLabel}`, cx, (bottom-H)-6);
+    ctx.fillText(`${it._score ?? 0}/3`, cx, (bottom-H)-22);
+
+    // Sélection / verrou
+    if(selected===it){
+      ctx.strokeStyle='#1e90ff'; ctx.setLineDash([5,3]);
+      ctx.strokeRect(left-3, bottom-H-3, W+6, H+6); ctx.setLineDash([]);
+    }
+    if(it.locked){ ctx.fillText('⚓', left+10, bottom-H+18); }
+
+    // Ancrages bleus
+    ctx.save(); ctx.fillStyle='#1877f2';
+    for(const p of (it.anchors||[])){ ctx.beginPath(); ctx.arc(toPxX(p.x), toPxY(p.y), 3, 0, Math.PI*2); ctx.fill(); }
+    ctx.restore();
+
+    return; // IMPORTANT : on sort ici, on ne dessine pas le rectangle de base
+  }
+
+  // ——— CAS GÉNÉRIQUES : RECT / RECTHOLE (comme avant) ———
+  if(Array.isArray(it._segments) && it._segments.length){
+    for(const seg of it._segments){
+      const sx = toPxX(seg.x0), sW=(seg.x1-seg.x0)*U;
+      ctx.fillStyle = seg.color || colorByScore(it._score||0);
+      ctx.fillRect(sx, bottom-H, sW, H);
+    }
+    ctx.strokeStyle='#444'; ctx.lineWidth=1.5;
+    ctx.strokeRect(left, bottom-H, W, H);
+  }else{
+    ctx.fillStyle = colorByScore(it._score||0);
+    ctx.fillRect(left, bottom-H, W, H);
+    ctx.strokeStyle='#444'; ctx.lineWidth=1.5; ctx.strokeRect(left, bottom-H, W, H);
+  }
+
+  // Évidement du rectHole uniquement (le rectangle reste la forme de base)
+  if(it.type==='rectHole'){
+    const cx = left+W/2, cy = bottom-H/2;
+    const rIntPx = Math.max(2, it.meta.rInt*U);
+    ctx.save(); ctx.globalCompositeOperation='destination-out';
+    ctx.beginPath(); ctx.arc(cx,cy,rIntPx,0,Math.PI*2); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.arc(cx,cy,rIntPx,0,Math.PI*2); ctx.stroke();
+  }
+
+  // Labels (poids + score)
+  ctx.fillStyle='#000'; ctx.font='12px system-ui'; ctx.textAlign='center';
+  const needLabel = (it._needMass!=null && Math.abs(it._needMass - it.mass) > 1e-6) ? ` (Σ ${Math.round(it._needMass)} kg)` : '';
+  ctx.fillText(`${it.mass} kg${needLabel}`, left+W/2, bottom-H-6);
+  ctx.fillText(`${it._score ?? 0}/3`, left+W/2, bottom-H-22);
+
+  // Sélection / verrou
+  if(selected===it){ ctx.strokeStyle='#1e90ff'; ctx.setLineDash([5,3]); ctx.strokeRect(left-3,bottom-H-3,W+6,H+6); ctx.setLineDash([]); }
+  if(it.locked){ ctx.fillText('⚓', left+10, bottom-H+18); }
+
+  // Ancrages bleus
+  ctx.save(); ctx.fillStyle='#1877f2';
+  for(const p of (it.anchors||[])){ ctx.beginPath(); ctx.arc(toPxX(p.x), toPxY(p.y), 3, 0, Math.PI*2); ctx.fill(); }
+  ctx.restore();
+}
+
+function clear(){ ctx.clearRect(0,0,cv.width,cv.height); }
+function drawAll(){ clear(); drawSemi(); for(const it of items) drawItem(it); }
+
+/* collisions / empilement */
+function overlapX(aL,aR,bL,bR){ return !(aR<=bL || bR<=aL); }
+function rectsOverlap(a,b, ax=a.x, ay=a.y, bx=b.x, by=b.y){
+  const aL=ax, aR=ax+a.w, aB=ay, aT=ay+a.h, bL=bx, bR=bx+b.w, bB=by, bT=by+b.h;
+  return !(aR<=bL || bR<=aL || aT<=bB || bT<=aB);
+}
+function wouldOverlap(target,nx,ny){
+  for(const it of items){ if(it===target) continue; if(rectsOverlap(target,it,nx,ny,it.x,it.y)) return true; }
+  return false;
+}
+function supportY(target,nx){
+  let sup=deck.y1;
+  for(const it of items){
+    if(it===target) continue;
+    if(overlapX(nx,nx+target.w, it.x, it.x+it.w)){ const top=it.y+it.h; if(top>sup) sup=top; }
+  }
+  return sup;
+}
+function settleAll(maxIter=40){
+  let changed=true,iter=0;
+  while(changed && iter<maxIter){
+    changed=false;iter++;
+    for(const it of items){
+      if(it.locked) continue;
+      const sup=supportY(it,it.x);
+      if(it.y>sup && !wouldOverlap(it,it.x,sup)){
+        it.y=sup; computeCargoAnchors(it); refreshStrapsForCargo(it); changed=true;
+      }
+    }
+  }
+  drawAll();
+}
+
+/* stubs (écrasés en PARTIE 2/3) */
+function refreshStrapsForCargo(_c){} function removeStrapsOfCargo(_id){} function evaluateItem(_it){} function evaluateAll(){drawAll();}
+
+/* UI refs */
+const shapeSel=document.getElementById('shape'),
+      rectFields=document.getElementById('rectFields'),
+      rectHoleFields=document.getElementById('rectHoleFields'),
+      ringFields=document.getElementById('ringFields');
+const wRect=document.getElementById('wRect'), hRect=document.getElementById('hRect');
+const wHole=document.getElementById('wHole'), hHole=document.getElementById('hHole'), rHole=document.getElementById('rHole');
+const rExt=document.getElementById('rExt'), rInt=document.getElementById('rInt');
+const massInp=document.getElementById('mass'), addBtn=document.getElementById('add'), selInfo=document.getElementById('selInfo'), lockBtn=document.getElementById('lockBtn'), delBtn=document.getElementById('delBtn');
+
+shapeSel.addEventListener('change', ()=>{
+  const t=shapeSel.value;
+  rectFields.classList.toggle('hide', !(t==='rect'));
+  rectHoleFields.classList.toggle('hide', !(t==='rectHole'));
+  ringFields.classList.toggle('hide', !(t==='ring'));
+});
+
+function setSelected(it){
+  selected=it||null;
+  if(selected){
+    selInfo.textContent=`${selected.id} – ${selected.type} – ${selected.w.toFixed(2)}×${selected.h.toFixed(2)} u – ${selected.mass} kg ${selected.locked?'[verrouillé]':''}`;
+    lockBtn.disabled=false; delBtn.disabled=false; lockBtn.textContent= selected.locked?'🔓 Déverrouiller':'⚓ Verrouiller';
+  }else{ selInfo.textContent='Aucun'; lockBtn.disabled=true; delBtn.disabled=true; lockBtn.textContent='⚓ Verrouiller'; }
+  drawAll();
+}
+
+addBtn.addEventListener('click', ()=>{
+  const t=shapeSel.value; let w,h,meta={};
+  if(t==='rect'){
+    w=Math.max(0.1,+wRect.value||1.2); h=Math.max(0.1,+hRect.value||1.0);
+  }else if(t==='rectHole'){
+    w=Math.max(0.1,+wHole.value||1.2); h=Math.max(0.1,+hHole.value||1.2);
+    const R=Math.max(0.05,+rHole.value||0.35);
+    // Rayon interne doit rentrer dans la pièce
+    const Rmax=Math.min(w,h)/2 - 0.02; if(R>=Rmax){ alert('Rint trop grand pour la pièce.'); return; }
+    meta={rInt:R};
+  }else{
+    const Rext=Math.max(0.1,+rExt.value||0.8), RintV=Math.max(0.05,+rInt.value||0.4);
+    if(RintV>=Rext){ alert('Rint < Rext'); return; }
+    w=2*Rext; h=2*Rext; meta={rInt:RintV};
+  }
+  const m=Math.max(0,+massInp.value||0);
+  let nx=0,placed=false,step=0.1;
+  for(nx=0; nx<=13-w+1e-6; nx+=step){ const ny=supportY({w,h},nx); if(!wouldOverlap({w,h},nx,ny)){ placed=true; break; } }
+  if(!placed) nx=Math.max(0,Math.min(13-w,0));
+  const ny=supportY({w,h},nx);
+  const it={id:'M'+(counter++), type:t, x:nx, y:ny, w, h, mass:m, locked:false, anchors:[], meta};
+  computeCargoAnchors(it); items.push(it); evaluateAll();
+});
+
+lockBtn.addEventListener('click', ()=>{ if(!selected) return; selected.locked=!selected.locked; setSelected(selected); });
+delBtn.addEventListener('click', ()=>{
+  if(!selected) return; const id=selected.id; items=items.filter(it=>it!==selected); setSelected(null); removeStrapsOfCargo(id); settleAll(); evaluateAll();
+});
+window.addEventListener('keydown', e=>{
+  if(e.key==='Delete' && selected){ const id=selected.id; items=items.filter(it=>it!==selected); setSelected(null); removeStrapsOfCargo(id); settleAll(); evaluateAll(); }
+});
+
+/* Drag en X */
+function hitItem(px,py){
+  for(let i=items.length-1;i>=0;i--){
+    const it=items[i], left=toPxX(it.x), bottom=toPxY(it.y), W=it.w*U, H=it.h*U, top=bottom-H, right=left+W;
+    if(px>=left && px<=right && py<=bottom && py>=top) return it;
+  } return null;
+}
+let dragging=null, dx=0, dy=0;
+cv.addEventListener('pointerdown', e=>{
+  const m=mouseToCanvas(e), px=m.x, py=m.y; const it=hitItem(px,py); setSelected(it);
+  if(!it || it.locked) return; dragging=it; cv.setPointerCapture(e.pointerId);
+  const left=toPxX(it.x), bottom=toPxY(it.y), top=bottom-it.h*U; dx=px-left; dy=py-top;
+});
+cv.addEventListener('pointermove', e=>{
+  if(!dragging) return; const m=mouseToCanvas(e), px=m.x;
+  let nx=(px - dx - M_LEFT)/U; nx=Math.max(0,Math.min(13-dragging.w,nx));
+  const sup=supportY(dragging,nx), ny=sup;
+  if(!wouldOverlap(dragging,nx,ny)){ dragging.x=nx; dragging.y=ny; computeCargoAnchors(dragging); refreshStrapsForCargo(dragging); evaluateItem(dragging); drawAll(); }
+});
+cv.addEventListener('pointerup', ()=>{ dragging=null; });
+
+/* ======= FIN PARTIE 1 — colle la PARTIE 2 ci-dessous (même <script>) ======= */
+/* =========================
+   PARTIE 2 — SANGLES (noir → bleu), édition, suppression
+   ========================= */
+let straps=[]; // {id,lc,color,from:{x,y},to:{cargoId,idx,x,y}}
+let selectedStrap=null, tempVehAnchor=null;
+
+const strapTypeSel=document.getElementById('strapType');
+const modeText=document.getElementById('modeText');
+const strapHelp=document.getElementById('strapHelp');
+
+function lcColor(lc){
+  if(lc<=600)  return '#10b981'; // 500
+  if(lc<=1500) return '#16a34a'; // 1000
+  if(lc<=2500) return '#2563eb'; // 2000
+  if(lc<=3500) return '#f59e0b'; // 3000
+  if(lc<=5000) return '#ef4444'; // 5000
+  return '#7c3aed';              // 6300
+}
+function refreshStrapTypeColor(){ const lc=+strapTypeSel.value; strapTypeSel.style.color=lcColor(lc); }
+refreshStrapTypeColor(); strapTypeSel.addEventListener('change',refreshStrapTypeColor);
+
+function isCoveredAtAnchor(item,anchor){
+  let topItem=null, topY=-Infinity;
+  for(const it of items){
+    if(anchor.x<it.x-1e-9 || anchor.x>it.x+it.w+1e-9) continue;
+    const yTop=it.y+it.h; if(yTop>topY){topY=yTop; topItem=it;}
+  }
+  return topItem && topItem!==item;
+}
+function findDeckAnchor(px,py){
+  for(const a of anchors){ const X=toPxX(a.x), Y=toPxY(a.y); if(Math.hypot(px-X,py-Y)<9) return a; }
+  return null;
+}
+function findCargoAnchor(px,py){
+  let best=null,bestD=1e9;
+  for(const it of items){
+    for(let i=0;i<(it.anchors||[]).length;i++){
+      const a=it.anchors[i]; if(isCoveredAtAnchor(it,a)) continue;
+      const X=toPxX(a.x), Y=toPxY(a.y), d=Math.hypot(px-X,py-Y);
+      if(d<9 && d<bestD){ best={cargo:it,idx:i,a}; bestD=d; }
+    }
+  }
+  return best;
+}
+
+/* ligne fantôme */
+let mousePx={x:0,y:0};
+cv.addEventListener('pointermove',e=>{ const m=mouseToCanvas(e); mousePx=m; if(tempVehAnchor) drawAll(); });
+
+/* dessin sangles au-dessus */
+function midOfStrap(s){ return {x:(s.from.x+s.to.x)/2, y:(s.from.y+s.to.y)/2}; }
+function hitDeleteOnStrap(px,py,s){ const m=midOfStrap(s), X=toPxX(m.x), Y=toPxY(m.y); return Math.hypot(px-X,py-Y)<=10; }
+function drawStraps(){
+  for(const s of straps){
+    const fX=toPxX(s.from.x), fY=toPxY(s.from.y), tX=toPxX(s.to.x), tY=toPxY(s.to.y);
+    ctx.save(); ctx.lineCap='round'; ctx.strokeStyle=s.color; ctx.lineWidth=(selectedStrap===s?6:4);
+    if(selectedStrap===s) ctx.setLineDash([10,6]);
+    ctx.beginPath(); ctx.moveTo(fX,fY); ctx.lineTo(tX,tY); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=s.color; ctx.font='12px system-ui'; ctx.textAlign='center';
+    ctx.fillText(`LC ${s.lc}`, (fX+tX)/2, (fY+tY)/2 - 12);
+    if(selectedStrap===s){
+      const m=midOfStrap(s), X=toPxX(m.x), Y=toPxY(m.y);
+      ctx.fillStyle='#fff'; ctx.strokeStyle=s.color; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(X,Y,10,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle=s.color; ctx.font='bold 12px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('✕', X, Y+0.5);
+    }
+    ctx.restore();
+  }
+  if(tempVehAnchor){
+    const fX=toPxX(tempVehAnchor.x), fY=toPxY(tempVehAnchor.y);
+    ctx.save(); ctx.strokeStyle='#6b7280'; ctx.lineWidth=3; ctx.setLineDash([6,6]);
+    ctx.beginPath(); ctx.moveTo(fX,fY); ctx.lineTo(mousePx.x,mousePx.y); ctx.stroke(); ctx.restore();
+  }
+}
+const _drawAll_base = drawAll;
+drawAll = function(){ clear(); drawSemi(); for(const it of items) drawItem(it); drawStraps(); };
+
+/* hit sangle */
+function lineDist(px,py,x1,y1,x2,y2){ const A=px-x1,B=py-y1,C=x2-x1,D=y2-y1, dot=A*C+B*D, len=C*C+D*D; let t=len?dot/len:-1; t=Math.max(0,Math.min(1,t)); const X=x1+t*C,Y=y1+t*D; return Math.hypot(px-X,py-Y); }
+function findStrapAt(px,py){
+  for(let i=straps.length-1;i>=0;i--){ const s=straps[i], fX=toPxX(s.from.x), fY=toPxY(s.from.y), tX=toPxX(s.to.x), tY=toPxY(s.to.y);
+    if(lineDist(px,py,fX,fY,tX,tY)<=9) return s; }
+  return null;
+}
+
+/* clics : noir→bleu + suppression croix + sélection */
+cv.onclick = function(e){
+  const m=mouseToCanvas(e), px=m.x, py=m.y;
+  if(selectedStrap && hitDeleteOnStrap(px,py,selectedStrap)){ straps=straps.filter(s=>s!==selectedStrap); selectedStrap=null; evaluateAll(); drawAll(); return; }
+  if(tempVehAnchor){
+    const hitBlue=findCargoAnchor(px,py);
+    if(hitBlue){
+      const lc=+strapTypeSel.value, color=lcColor(lc);
+      straps.push({id:'S'+(straps.length+1), lc, color, from:{x:tempVehAnchor.x,y:tempVehAnchor.y}, to:{cargoId:hitBlue.cargo.id,idx:hitBlue.idx,x:hitBlue.a.x,y:hitBlue.a.y}});
+      tempVehAnchor=null; selectedStrap=null; modeText.textContent='Déplacement'; strapHelp.textContent='Sangle créée. Clique un autre point noir pour recommencer.'; evaluateAll(); drawAll(); return;
+    }
+    tempVehAnchor=null; drawAll(); return;
+  }
+  const hitBlack=findDeckAnchor(px,py);
+  if(hitBlack){ tempVehAnchor={x:hitBlack.x,y:hitBlack.y}; selectedStrap=null; modeText.textContent='Pose : choisis un point bleu (marchandise).'; strapHelp.textContent='Clique un point bleu pour terminer la sangle.'; drawAll(); return; }
+  const hitS=findStrapAt(px,py); if(hitS){ selectedStrap=hitS; drawAll(); return; }
+  selectedStrap=null; drawAll();
+};
+/* double-clic : recaler extrémités */
+cv.addEventListener('dblclick', e=>{
+  if(!selectedStrap) return; const m=mouseToCanvas(e), px=m.x, py=m.y;
+  const hitBlack=findDeckAnchor(px,py); if(hitBlack){ selectedStrap.from.x=hitBlack.x; selectedStrap.from.y=hitBlack.y; evaluateAll(); drawAll(); return; }
+  const hitBlue=findCargoAnchor(px,py); if(hitBlue){ selectedStrap.to.cargoId=hitBlue.cargo.id; selectedStrap.to.idx=hitBlue.idx; selectedStrap.to.x=hitBlue.a.x; selectedStrap.to.y=hitBlue.a.y; evaluateAll(); drawAll(); }
+});
+/* clavier */
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ tempVehAnchor=null; selectedStrap=null; drawAll(); } });
+window.addEventListener('keydown',e=>{ if(e.key==='Delete' && !selected){ if(straps.length){ straps.pop(); evaluateAll(); drawAll(); } } });
+/* MAJ sangles quand colis bouge / supprime */
+function refreshStrapsForCargo(cargo){ for(const s of straps){ if(s.to.cargoId===cargo.id){ const a=cargo.anchors[s.to.idx]; if(a){ s.to.x=a.x; s.to.y=a.y; } } } }
+function removeStrapsOfCargo(id){ straps=straps.filter(s=>s.to.cargoId!==id); }
+/* =========================
+   PARTIE 3 — ÉVALUATION (colonnes/segments bas→haut + DP overshoot)
+   ========================= */
+const EPS=1e-6;
+const ALLOWED_LC=[500,1000,2000,3000,5000,6300];
+
+/* Découpage X : bords de tous les colis */
+function buildXBreaks(){
+  const xs=new Set([0,13]);
+  for(const it of items){ xs.add(+it.x.toFixed(6)); xs.add(+(it.x+it.w).toFixed(6)); }
+  return Array.from(xs).sort((a,b)=>a-b);
+}
+
+/* Construit les colonnes par segment: {x0,x1,column:[items bas→haut]} */
+function buildSegments(){
+  const xb=buildXBreaks();
+  const segs=[];
+  for(let i=0;i<xb.length-1;i++){
+    const x0=xb[i], x1=xb[i+1]; if(x1-x0<=1e-9) continue;
+    const column = items
+      .filter(it => !(it.x+it.w<=x0+EPS || it.x>=x1-EPS))
+      .sort((a,b)=>(a.y+a.h)-(b.y+b.h)); // bas→haut
+    if(column.length) segs.push({x0,x1,column});
+  }
+  return segs;
+}
+
+/* Calcule _segNeeds avec SOMME VERS LE BAS (bas→k) et renvoie les segments */
+function computeSegmentNeedsAndColumns(){
+  const segs = buildSegments();
+  for(const it of items){ it._segNeeds=[]; it._segments=[]; }
+  for(const seg of segs){
+    const {x0,x1,column}=seg; // bas→haut
+    let cum=0;
+    for(let k=0;k<column.length;k++){
+      cum += column[k].mass;                        // somme du bas jusqu’à k
+      column[k]._segNeeds.push({x0,x1,need:cum});   // besoin local de k sur [x0,x1)
+    }
+  }
+  for(const it of items){
+    it._needMass = it._segNeeds.length ? Math.max(...it._segNeeds.map(s=>s.need)) : it.mass;
+  }
+  return segs;
+}
+
+/* sangles présentes sur [x0,x1) pour n'importe quel élément de la colonne,
+   + crédit vertical : les sangles des colis supérieurs s’appliquent aussi à ceux du dessous */
+function strapsInColumnForSegment(x0,x1,column){
+  // On récupère toutes les sangles dont le point bleu est dans la plage horizontale
+  const strapsInZone = straps.filter(s => s.to.x >= x0 - EPS && s.to.x < x1 + EPS);
+
+  if (column.length === 0) return [];
+
+  // Pour chaque sangle attachée à un colis supérieur,
+  // on la crédite aussi à tous les colis situés sous ce colis.
+  const credited = [];
+  for (const s of strapsInZone) {
+    const idx = column.findIndex(it => it.id === s.to.cargoId);
+    if (idx === -1) continue;
+    for (let k = 0; k <= idx; k++) {
+      credited.push({
+        ...s,
+        creditedFor: column[k].id
+      });
+    }
+  }
+  return credited;
+}
+
+/* utilitaires */
+function strapsForItem(it){ return straps.filter(s => s.to.cargoId===it.id); }
+function strapAngleDeg(s){ const dx=s.to.x-s.from.x, dy=s.to.y-s.from.y; return Math.abs(Math.atan2(dy,dx)*180/Math.PI); }
+
+/* DP : meilleure somme ≥ T avec exactement k sangles */
+function bestSumAtLeast(T,k){
+  if(k<=0) return Infinity;
+  let set=new Set([0]);
+  const maxAdd=Math.max(...ALLOWED_LC);
+  const LIMIT=T+maxAdd*k;
+  for(let i=0;i<k;i++){
+    const next=new Set();
+    for(const s of set){ for(const v of ALLOWED_LC){ const nv=s+v; if(nv<=LIMIT) next.add(nv); } }
+    if(next.size>50000){
+      const reduced=new Set();
+      for(const v of Array.from(next).sort((a,b)=>a-b)){ const key=Math.floor(v/10); if(!reduced.has(key)) reduced.add(key); }
+      set=new Set(Array.from(reduced).map(k=>k*10));
+    }else set=next;
+  }
+  let best=Infinity;
+  for(const v of set){ if(v>=T && v<best) best=v; }
+  return best;
+}
+
+function colorByScore(s){ return s>=3?'#22c55e':s===2?'#eab308':s===1?'#f59e0b':'#ef4444'; }
+
+function evaluateItem(it, allSegments){
+  // Info globale (inchangée)
+  const Sitem = strapsForItem(it);
+  const kItem = Sitem.length;
+  const needAll = it._needMass || it.mass || 0;
+  let N_info=false, P_info=false;
+  if (it.type!=='ring' && needAll<400 && kItem===1) N_info=true; else N_info=(kItem>=2);
+  if (it.type==='ring') { const angled=Sitem.filter(s=>strapAngleDeg(s)>=15); P_info=(angled.length>=2); }
+  else { if (kItem===1 && N_info) P_info=true; else { const used=new Set(Sitem.map(s=>s.to.idx)); P_info=(used.size>=2); } }
+
+  it._segments=[];
+  const hints = [];
+  const addHint = msg => { if(!hints.includes(msg)) hints.push(msg); };
+  const getColForSeg = (x0,x1) => allSegments.find(s => Math.abs(s.x0-x0)<1e-6 && Math.abs(s.x1-x1)<1e-6);
+
+  let minSeg = 3;
+  for (const seg of it._segNeeds){
+    const {x0,x1,need} = seg;
+
+    const colObj = getColForSeg(x0,x1);
+    const col = colObj ? colObj.column : [];
+    const idx = col.findIndex(o => o.id === it.id);
+
+    // Sangles dispo sur la colonne (avec crédit vertical)
+    const Scol = strapsInColumnForSegment(x0,x1,col);
+    const kCol = Scol.length;
+    const sumLC = Scol.reduce((a,s)=>a+(s.lc||0),0);
+
+    // N
+    let N_ok=false;
+    if (it.type==='ring') N_ok = (kCol>=2);
+    else N_ok = (need<400 && kCol===1) || (kCol>=2);
+    if(!N_ok){
+      if(kCol===0) addHint("Aucune sangle sur une partie de la charge.");
+      else if(kCol===1) addHint("Une seule sangle posée sur une zone : risque de basculement.");
+    }
+
+    // P
+    let P_ok=false;
+    if (it.type==='ring') {
+      const angled = Scol.filter(s=>strapAngleDeg(s)>=15);
+      P_ok = (angled.length>=2);
+      if(!P_ok) addHint("Mauvais angle d’arrimage : ≥15° requis pour un anneau.");
+    } else {
+      if (need<400 && kCol===1) {
+        P_ok = true;
+      } else {
+        const xs=Scol.map(s=>s.to.x).sort((a,b)=>a-b);
+        let distinct=0,last=null;
+        for (const x of xs){ if(last===null || Math.abs(x-last)>0.02){ distinct++; last=x; if(distinct>=2) break; } }
+        P_ok = (distinct>=2);
+        if(!P_ok) addHint("Sangles trop proches : utilise deux ancrages hauts différents.");
+        const mid=(x0+x1)/2;
+        const L=Scol.filter(s=>s.to.x<mid).length, R=Scol.filter(s=>s.to.x>mid).length;
+        if(Math.abs(L-R)>=2) addHint("Répartition déséquilibrée : pas assez de sangles d’un côté.");
+        if(L===0 && kCol>=2) addHint("Pas de sangle côté gauche sur un segment.");
+        if(R===0 && kCol>=2) addHint("Pas de sangle côté droit sur un segment.");
+      }
+    }
+
+    // F
+    let lowerS, upperS;
+    if (kCol===2 && !(it.type!=='ring' && need<400 && kCol===1)) { lowerS=1.8*need; upperS=2.2*need; }
+    else { lowerS=0.90*need; upperS=1.25*need; }
+    const F_ok = (kCol>0) ? (sumLC>=lowerS && sumLC<=upperS*1.0) : false;
+    if(!F_ok){
+      if(sumLC<lowerS) addHint("Force d’arrimage insuffisante : ajoute une sangle ou choisis une LC plus élevée.");
+      else if(sumLC>upperS) addHint("Force d’arrimage trop élevée : retire une sangle ou choisis une LC plus faible.");
+    }
+
+    let score = (N_ok?1:0)+(P_ok?1:0)+(F_ok?1:0);
+
+    // Crédit vertical
+    if (idx >= 0 && idx < col.length - 1) {
+      let massAbove = 0;
+      for (let j = idx+1; j < col.length; j++) massAbove += col[j].mass;
+
+      if (massAbove > 0) {
+        const idsAbove = new Set(col.slice(idx+1).map(o=>o.id));
+        const S_above = Scol.filter(s=>idsAbove.has(s.to.cargoId));
+        const kA = S_above.length;
+        const sumA = S_above.reduce((a,s)=>a+(s.lc||0),0);
+
+        let N_A = (kA>=2);
+        let P_A = false;
+        if (N_A) {
+          const xsA = S_above.map(s=>s.to.x).sort((a,b)=>a-b);
+          let d=0,lastA=null; 
+          for(const x of xsA){ if(lastA===null || Math.abs(x-lastA)>0.02){ d++; lastA=x; if(d>=2) break; } }
+          P_A = (d>=2);
+        }
+        const lowA = 1.6 * massAbove, upA = 2.4 * massAbove;
+        const F_A = (sumA>=lowA && sumA<=upA);
+
+        if (N_A && P_A && F_A) {
+          score = Math.max(score, 3);
+        } else {
+          if(!N_A) addHint("Le colis au-dessus n’est pas assez sanglé pour protéger la zone du dessous.");
+          if(!P_A) addHint("Mauvaise répartition des sangles au-dessus : écarte-les.");
+          if(!F_A) addHint("Force des sangles du colis supérieur inadaptée pour couvrir le dessous.");
+        }
+      }
+    }
+
+    minSeg = Math.min(minSeg, score);
+    it._segments.push({x0,x1,need,score,color:colorByScore(score)});
+  }
+
+  // Couleur globale (couverture)
+  const totalW = it.w;
+  const greenW = it._segments.filter(s=>s.score>=3).reduce((a,s)=>a+(s.x1-s.x0),0);
+  const cover = greenW / totalW;
+  it._score = (cover >= 0.60 && minSeg < 3) ? 2 : minSeg;
+
+  // Diagnostics + conseils
+  const why=[];
+  if(!N_info) why.push('Nombre de sangles insuffisant sur l’objet (info globale).');
+  if(!P_info) why.push(it.type==='ring'?'Angles insuffisants (anneau).':'Utiliser ≥2 ancrages hauts différents (rectangle).');
+  if(Sitem.length===0) why.push('Aucune sangle posée directement sur cet objet.');
+  why.push('Crédit vertical : les sangles du colis supérieur peuvent sécuriser le dessous.');
+  if(it.type!=='ring' && needAll<400 && kItem===1) why.push('✅ Cas spécial rect < 400 kg : 1 sangle acceptée.');
+  it._why = why;
+  it._hints = hints;
+}
+
+
+/* Évalue toute la scène */
+function evaluateAll(){
+  const segments = computeSegmentNeedsAndColumns();
+  for(const it of items) evaluateItem(it, segments);
+  drawAll();
+}
+
+/* enrichit le panneau sélection */
+const _setSelected_base = setSelected;
+setSelected = function(it){
+  _setSelected_base(it);
+  if(selected){
+    const head = `${selected.id} – ${selected.type} – ${selected.w.toFixed(2)}×${selected.h.toFixed(2)} u – ${selected.mass} kg ${selected.locked?'[verrouillé]':''}`;
+    selInfo.innerHTML = `<div>${head}</div>`;
+
+    // Diagnostics (rouge/vert)
+    if (Array.isArray(selected._why) && selected._why.length){
+      const ul=document.createElement('ul'); ul.style.margin='6px 6px 0'; ul.style.paddingLeft='18px';
+      selected._why.forEach(msg=>{
+        const li=document.createElement('li'); li.textContent=msg;
+        li.style.color = (msg.startsWith('Crédit vertical') || msg.startsWith('✅')) ? '#16a34a' : '#ef4444';
+        ul.appendChild(li);
+      });
+      selInfo.appendChild(ul);
+    }
+
+    // Conseils pédagogiques (bleu)
+    if (Array.isArray(selected._hints) && selected._hints.length){
+      const t=document.createElement('div'); t.textContent='💡 Conseils / pistes de correction :';
+      t.style.margin='8px 6px 0'; t.style.fontWeight='600';
+      selInfo.appendChild(t);
+
+      const ul2=document.createElement('ul'); ul2.style.margin='4px 6px 0'; ul2.style.paddingLeft='18px';
+      selected._hints.forEach(msg=>{
+        const li=document.createElement('li'); li.textContent=msg; li.style.color='#2563eb'; ul2.appendChild(li);
+      });
+      selInfo.appendChild(ul2);
+    }
+  }
+};
+
+
+/* boot */
+evaluateAll(); drawAll();
+
+/* ======= FIN PARTIE 3 — colle PARTIE 4 ci-dessous (fermetures) ======= */
+</script>
+</body>
+</html>
