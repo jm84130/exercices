@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Organigramme – Transport routier LEGRAKK TPS – interactif</title>
+<style>
+  :root{
+    --bg:#0f172a;--text:#e5e7eb;--muted:#9ca3af;
+    --shadow:0 8px 16px rgba(0,0,0,.30),0 4px 4px rgba(0,0,0,.22);
+    --pdg:#ffffff20; --pdg-border:#e5e7eb;
+    --comm:#1e40af20; --comm-border:#60a5fa;
+    --expl:#064e3b20; --expl-border:#34d399;
+    --fact:#78350f20; --fact-border:#f59e0b;
+    --rh:#83184320;   --rh-border:#f472b6;
+    --tech:#facc1520; --tech-border:#facc15;
+    --qse:#0891b220;  --qse-border:#67e8f9;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#030712 30%);color:var(--text);font-family:Inter,system-ui,Arial}
+  header{position:sticky;top:0;z-index:5;backdrop-filter:blur(6px);background:rgba(17,24,39,.85);border-bottom:1px solid rgba(148,163,184,.15)}
+  .wrap{max-width:1200px;margin:0 auto;padding:12px 16px}
+  h1{margin:0;font-size:clamp(18px,2.2vw,26px)} .sub{color:var(--muted);font-size:12px}
+  .toolbar{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .btn{background:linear-gradient(180deg,#2563eb,#1e40af);color:#fff;border:0;padding:6px 10px;border-radius:10px;cursor:pointer;box-shadow:var(--shadow);font-size:13px}
+  .btn.secondary{background:linear-gradient(180deg,#334155,#111827)}
+  .btn.ghost{background:transparent;border:1px solid rgba(148,163,184,.25);color:var(--text)}
+  .tree{padding:16px 32px 16px 320px;overflow:auto;height:calc(100vh - 146px)}
+  .node{display:inline-block;position:relative;border:1px solid rgba(148,163,184,.18);border-radius:12px;
+        padding:8px 10px;min-width:160px;box-shadow:var(--shadow);cursor:pointer;user-select:none;text-align:center}
+  .node.pdg{background:var(--pdg);border-color:var(--pdg-border)}
+  .node.comm{background:var(--comm);border-color:var(--comm-border)}
+  .node.expl{background:var(--expl);border-color:var(--expl-border)}
+  .node.fact{background:var(--fact);border-color:var(--fact-border)}
+  .node.rh{background:var(--rh);border-color:var(--rh-border)}
+  .node.tech{background:var(--tech);border-color:var(--tech-border)}
+  .node.qse{background:var(--qse);border-color:var(--qse-border)}
+  .title{font-weight:700;font-size:13px;line-height:1.2}
+  .level{font-size:10px;color:var(--muted);margin-top:2px}
+  .meta{font-size:11px;color:var(--muted);margin-top:2px}
+  .poste{color:#93c5fd}
+  .tree ul{padding-top:14px;position:relative;display:flex;gap:18px;justify-content:flex-start;flex-wrap:nowrap}
+  .tree ul::before{content:"";position:absolute;top:0;left:0;right:0;margin:auto;border-top:1px dashed rgba(148,163,184,.25);width:95%}
+  .tree li{list-style:none;text-align:center;position:relative;padding:16px 4px 0 4px}
+  .tree li::before,.tree li::after{content:"";position:absolute;top:0;width:50%;height:16px;border-top:1px dashed rgba(148,163,184,.25)}
+  .tree li::before{left:-50%;border-right:1px dashed rgba(148,163,184,.25)}
+  .tree li::after{right:-50%;border-left:1px dashed rgba(148,163,184,.25)}
+  .tree li:only-child::before,.tree li:only-child::after{display:none}
+  .tree li:first-child::before,.tree li:last-child::after{border:0 none}
+  .collapsed>ul{display:none}
+
+  /* Vue par niveaux */
+  .levels{display:none;padding:16px 32px 16px 48px;overflow:auto;height:calc(100vh - 146px)}
+  .levels .row-title{font-size:12px;color:var(--muted);margin:10px 0 6px 2px}
+  .levels .row{display:flex;gap:14px;align-items:flex-start;flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px}
+  .levels .node{min-width:160px}
+
+  /* Toast succès centré */
+  .toasts{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100;pointer-events:none}
+  .toast{background:#111827e6;border:2px solid rgba(148,163,184,.6);color:#e5e7eb;
+         padding:16px 22px;border-radius:14px;font-size:16px;box-shadow:var(--shadow);
+         animation:pop 0.4s ease-out;min-width:260px;text-align:center}
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(.7);opacity:0;}100%{transform:translate(-50%,-50%) scale(1);opacity:1;}}
+  .toast .title{font-weight:800;font-size:17px;margin-bottom:4px}
+  .toast .txt{font-size:14px;color:#cbd5e1}
+  footer{text-align:center;color:#9ca3af;font-size:12px;padding:10px 0 14px;border-top:1px solid rgba(148,163,184,.15);background:rgba(15,23,42,.4);backdrop-filter:blur(4px)}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Organigramme – Transport routier LEGRAKK TPS <span class="sub">(clic = déplier/replier · Alt+clic = toute la branche)</span></h1>
+    <div class="toolbar">
+      <button class="btn" id="expandAll">Tout développer</button>
+      <button class="btn secondary" id="collapseAll">Tout replier</button>
+      <button class="btn ghost" id="toggleView">Vue par niveaux</button>
+    </div>
+  </div>
+</header>
+
+<div class="tree" id="tree"></div>
+<div class="levels" id="levels"></div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+(function(){
+  const regions=["Paris","Nord-Ouest","Nord-Est","Sud-Ouest","Sud-Est"];
+  const Q={COMM:5,MEC:20,PL:80,SPL:50,QUAI:30};
+  const easterNames=new Set([
+    "Akira Toriyama","Jean-Marie Chazel","Fabrice Blondot","Muhammad Ali","Mikasa Akerman",
+    "Sheldon Cooper","Rajesh Koothrappali","Howard Wolowitz","Monica Geller","Walter White",
+    "Daenerys Targaryen","Enid Sinclair","Ichigo Kurosaki","Light Yagami","Eikichi Onizuka",
+    "Morgan Freeman","Oprah Winfrey","Ellen Ripley","???"
+  ]);
+
+  const P={PDG:{nom:"Jean-Marie Chazel",poste:"999"},
+    Resp_Com_Nat:{nom:"Muhammad Ali",poste:"191"},Resp_Expl_Nat:{nom:"Mikasa Akerman",poste:"192"},
+    Resp_Fact:{nom:"Walter White",poste:"193"},Cpt_Four:{nom:"Monica Geller",poste:"194"},
+    Cpt_Cli:{nom:"Oprah Winfrey",poste:"195"},Resp_RH:{nom:"Fabrice Blondot",poste:"196"},
+    Gest_Parc:{nom:"Howard Wolowitz",poste:"197"},Resp_QSE:{nom:"Ellen Ripley",poste:"198"},
+    Form_Nat:{nom:"Eikichi Onizuka",poste:"199"},
+    Resp_Com_Paris:{nom:"Ichigo Kurosaki",poste:"291"},Resp_Com_NO:{nom:"Light Yagami",poste:"292"},
+    Resp_Com_NE:{nom:"Enid Sinclair",poste:"293"},Resp_Com_SO:{nom:"Morgan Freeman",poste:"294"},
+    Resp_Com_SE:{nom:"Akira Toriyama",poste:"295"},
+    Resp_Expl_Paris:{nom:"Rajesh Koothrappali",poste:"296"},Resp_Expl_NO:{nom:"Sheldon Cooper",poste:"297"},
+    Resp_Expl_NE:{nom:"Daenerys Targaryen",poste:"298"},Resp_Expl_SO:{nom:"Amadou Diop",poste:"299"},
+    Resp_Expl_SE:{nom:"???",poste:"219"},
+    Explo_Paris:{nom:"Hassan Khan",poste:"231"},Explo_NO:{nom:"Selma Haddou",poste:"232"},
+    Explo_NE:{nom:"Ethan Johnson",poste:"233"},Explo_SO:{nom:"Maya Lopez",poste:"234"},
+    Explo_SE:{nom:"Ji-ho Park",poste:"235"},
+    ChefQuai_Paris:{nom:"Aïcha Diallo",poste:"261"},ChefQuai_NO:{nom:"Isabella Rossi",poste:"262"},
+    ChefQuai_NE:{nom:"Kwame Mensah",poste:"263"},ChefQuai_SO:{nom:"Youssef Benali",poste:"264"},
+    ChefQuai_SE:{nom:"Bao Nguyen",poste:"265"},
+    Chef_Parc_Paris:{nom:"Selim Kaya",poste:"241"},Chef_Parc_NO:{nom:"Kofi Boateng",poste:"242"},
+    Chef_Parc_NE:{nom:"Jade Nguyen",poste:"243"},Chef_Parc_SO:{nom:"Tariq Rahman",poste:"244"},
+    Chef_Parc_SE:{nom:"Camila Costa",poste:"245"},
+    Form_Paris:{nom:"Chloé Dubois",poste:"251"},Form_NO:{nom:"Yuna Tanaka",poste:"252"},
+    Form_NE:{nom:"Rafael Silva",poste:"253"},Form_SO:{nom:"Olaide Adebayo",poste:"254"},
+    Form_SE:{nom:"Nora Svensson",poste:"255"}};
+
+  function makeNode({title,level,pole,nom,poste,children=[]}){return{title,level,pole,name:nom||"",poste:poste||"",children};}
+  function isPole(t){return t.toLowerCase().includes("pôle")||t.toLowerCase().includes("direction");}
+
+  const toasts=document.getElementById("toasts"),achieved=new Set(),clicked=new Set();
+  function toast(t,txt){const b=document.createElement("div");b.className="toast";b.innerHTML=`<div class="title">🏆 ${t}</div><div class="txt">${txt}</div>`;toasts.innerHTML="";toasts.appendChild(b);setTimeout(()=>b.remove(),2600);}
+  function unlock(id,t,txt){if(achieved.has(id))return;achieved.add(id);toast(t,txt);}
+
+  const root=makeNode({title:"PDG",level:1,pole:"pdg",nom:P.PDG.nom,poste:P.PDG.poste,children:[
+    makeNode({title:"Pôle Commercial",pole:"comm"}),
+    makeNode({title:"Pôle Exploitation",pole:"expl"}),
+    makeNode({title:"Direction Facturation & Administratif",pole:"fact"}),
+    makeNode({title:"Pôle RH",pole:"rh"}),
+    makeNode({title:"Pôle Technique & Parc",pole:"tech"}),
+    makeNode({title:"Pôle Qualité & Sécurité Environnement",pole:"qse"})
+  ]});
+  const [pComm,pExpl,pFact,pRh,pTech,pQSE]=root.children;
+  const respComNat=makeNode({title:"Responsable commercial national",level:2,pole:"comm",nom:P.Resp_Com_Nat.nom,poste:P.Resp_Com_Nat.poste});
+  const respExNat=makeNode({title:"Responsable exploitation national",level:2,pole:"expl",nom:P.Resp_Expl_Nat.nom,poste:P.Resp_Expl_Nat.poste});
+  const respFact=makeNode({title:"Responsable facturation",level:2,pole:"fact",nom:P.Resp_Fact.nom,poste:P.Resp_Fact.poste});
+  const cptFour=makeNode({title:"Comptabilité fournisseur",level:2,pole:"fact",nom:P.Cpt_Four.nom,poste:P.Cpt_Four.poste});
+  const cptCli=makeNode({title:"Comptabilité client",level:2,pole:"fact",nom:P.Cpt_Cli.nom,poste:P.Cpt_Cli.poste});
+  const respRH=makeNode({title:"Responsable RH",level:2,pole:"rh",nom:P.Resp_RH.nom,poste:P.Resp_RH.poste});
+  const gestParc=makeNode({title:"Gestionnaire Parc et Services",level:2,pole:"tech",nom:P.Gest_Parc.nom,poste:P.Gest_Parc.poste});
+  const respQSE=makeNode({title:"Responsable QSE",level:2,pole:"qse",nom:P.Resp_QSE.nom,poste:P.Resp_QSE.poste});
+  const formNat=makeNode({title:"Formateur national",level:3,pole:"qse",nom:P.Form_Nat.nom,poste:P.Form_Nat.poste});
+  pComm.children.push(respComNat);pExpl.children.push(respExNat);pFact.children.push(respFact,cptFour,cptCli);
+  pRh.children.push(respRH);pTech.children.push(gestParc);pQSE.children.push(respQSE);respQSE.children.push(formNat);
+
+  const comReg=[P.Resp_Com_Paris,P.Resp_Com_NO,P.Resp_Com_NE,P.Resp_Com_SO,P.Resp_Com_SE];
+  const explReg=[P.Resp_Expl_Paris,P.Resp_Expl_NO,P.Resp_Expl_NE,P.Resp_Expl_SO,P.Resp_Expl_SE];
+  const exploNom=[P.Explo_Paris,P.Explo_NO,P.Explo_NE,P.Explo_SO,P.Explo_SE];
+  const chefQuai=[P.ChefQuai_Paris,P.ChefQuai_NO,P.ChefQuai_NE,P.ChefQuai_SO,P.ChefQuai_SE];
+  const parcReg=[P.Chef_Parc_Paris,P.Chef_Parc_NO,P.Chef_Parc_NE,P.Chef_Parc_SO,P.Chef_Parc_SE];
+  const formReg=[P.Form_Paris,P.Form_NO,P.Form_NE,P.Form_SO,P.Form_SE];
+
+  regions.forEach((r,i)=>{
+    respExNat.children.push(makeNode({title:`Responsable exploitation régional – ${r}`,level:3,pole:"expl",nom:explReg[i].nom,poste:explReg[i].poste,children:[
+      makeNode({title:"Exploitant·e",level:4,pole:"expl",nom:exploNom[i].nom,poste:exploNom[i].poste,children:[
+        makeNode({title:"Chef de quai",level:5,pole:"expl",nom:chefQuai[i].nom,poste:chefQuai[i].poste,children:[
+          makeNode({title:`Techniciens de quai (${Q.QUAI})`,level:6,pole:"expl"})
+        ]}),
+        makeNode({title:`Conducteurs PL (${Q.PL})`,level:5,pole:"expl"}),
+        makeNode({title:`Conducteurs SPL (${Q.SPL})`,level:5,pole:"expl"})
+      ]})
+    ]}));
+    respComNat.children.push(makeNode({title:`Responsable commercial régional – ${r}`,level:4,pole:"comm",nom:comReg[i].nom,poste:comReg[i].poste,children:[
+      makeNode({title:`Commerciaux (${Q.COMM})`,level:5,pole:"comm"})
+    ]}));
+    gestParc.children.push(makeNode({title:`Chef de Parc – ${r}`,level:4,pole:"tech",nom:parcReg[i].nom,poste:parcReg[i].poste,children:[
+      makeNode({title:`Mécaniciens PL (${Q.MEC})`,level:5,pole:"tech"})
+    ]}));
+    formNat.children.push(makeNode({title:`Formateur régional – ${r}`,level:4,pole:"qse",nom:formReg[i].nom,poste:formReg[i].poste}));
+  });
+
+  const tree=document.getElementById("tree");
+  const levels=document.getElementById("levels");
+  const topUL=document.createElement("ul");
+  topUL.appendChild(renderNode(root,true));
+  tree.appendChild(topUL);
+  collapseToPoles();
+
+  document.getElementById("expandAll").onclick=()=>{document.querySelectorAll(".tree li").forEach(li=>li.classList.remove("collapsed"));unlock("bordel","Un bordel organisé","Vous avez tout déployé.");};
+  document.getElementById("collapseAll").onclick=()=>collapseToPoles();
+  document.getElementById("toggleView").onclick=()=>toggleView();
+
+  function renderNode(n,isRoot=false){
+    const li=document.createElement("li");
+    const card=document.createElement("div");
+    card.className="node "+(n.pole||"");
+    const lvl=(!n.level||isPole(n.title))?"":`<div class='level'>Niveau ${n.level}</div>`;
+    const meta=(n.name||n.poste)?`<div class='meta'><span>${n.name||""}</span>${n.poste?` · <span class='poste'>poste ${n.poste}</span>`:""}</div>`:"";
+    card.innerHTML=`<div class='title'>${n.title}</div>${lvl}${meta}`;
+    card.onclick=(e)=>{
+      e.stopPropagation();
+      if(n.name){
+        clicked.add(n.name);
+        if(clicked.has("Jean-Marie Chazel")&&clicked.has("Fabrice Blondot"))unlock("ils","Les terreurs sont là !","Jean-Marie Chazel et Fabrice Blondot ont été cliqués.");
+        if(n.name==="???")unlock("myst","Qui est-ce ?","Vous avez trouvé ???");
+        let all=true;easterNames.forEach(x=>{if(!clicked.has(x))all=false;});if(all)unlock("pokedex","Attrapez-les tous","Tous les personnages easter-egg ont été cliqués !");
+      }
+      toggle(li,e.altKey);
+    };
+    li.appendChild(card);
+    if(n.children&&n.children.length){
+      const ul=document.createElement("ul");
+      n.children.forEach(c=>ul.appendChild(renderNode(c)));
+      li.appendChild(ul);
+      li.classList.add("collapsed");
+      if(isRoot)li.classList.remove("collapsed");
+    }
+    return li;
+  }
+
+  function toggle(li,deep){
+    const ul=li.querySelector(":scope>ul");if(!ul)return;
+    const expand=li.classList.contains("collapsed");
+    li.classList.toggle("collapsed");
+    if(deep)ul.querySelectorAll("li").forEach(x=>expand?x.classList.remove("collapsed"):x.classList.add("collapsed"));
+  }
+  function collapseAll(){document.querySelectorAll(".tree li").forEach(li=>li.classList.add("collapsed"));}
+  function collapseToPoles(){collapseAll();const r=topUL.firstElementChild;if(!r)return;r.classList.remove("collapsed");document.getElementById("tree").scrollLeft=0;}
+
+  function collectByLevel(){
+    const m={poles:[]};root.children.forEach(p=>m.poles.push(p));
+    (function w(n){if(n.level){if(!m[n.level])m[n.level]=[];m[n.level].push(n);}n.children?.forEach(w)})(root);
+    return m;
+  }
+  function cardify(n,hide=false){const d=document.createElement("div");d.className="node "+(n.pole||"");
+    const lvl=(!n.level||isPole(n.title)||hide)?"":`<div class='level'>Niveau ${n.level}</div>`;
+    const meta=(n.name||n.poste)?`<div class='meta'><span>${n.name||""}</span>${n.poste?` · <span class='poste'>poste ${n.poste}</span>`:""}</div>`:"";
+    d.innerHTML=`<div class='title'>${n.title}</div>${lvl}${meta}`;return d;}
+  function buildLevelsView(){
+    levels.innerHTML="";const g=collectByLevel();
+    const n1=document.createElement("div");n1.innerHTML="<div class='row-title'>Niveau 1</div><div class='row'></div>";levels.appendChild(n1);n1.querySelector(".row").appendChild(cardify(root));
+    const pole=document.createElement("div");pole.innerHTML="<div class='row-title'>Pôles</div><div class='row'></div>";levels.appendChild(pole);g.poles.forEach(p=>pole.querySelector(".row").appendChild(cardify(p,true)));
+    const max=Math.max(...Object.keys(g).filter(k=>k!=="poles").map(Number));
+    for(let L=2;L<=max;L++){if(!g[L])continue;const w=document.createElement("div");w.innerHTML=`<div class='row-title'>Niveau ${L}</div><div class='row'></div>`;levels.appendChild(w);g[L].forEach(n=>w.querySelector(".row").appendChild(cardify(n)));}
+  }
+  let byLevels=false;
+  function toggleView(){byLevels=!byLevels;const b=document.getElementById("toggleView");
+    if(byLevels){buildLevelsView();tree.style.display="none";levels.style.display="block";b.textContent="Vue arborescence";}
+    else{levels.style.display="none";tree.style.display="block";b.textContent="Vue par niveaux";}
+  }
+})();
+</script>
+
+<footer>
+  Logiciel créé et proposé par <strong>M. Chazel</strong> – Professeur, Lycée professionnel <strong>Les Alpilles</strong> – Miramas
+</footer>
+</body>
+</html>
